@@ -2,11 +2,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Unity.Mathematics;
 using Unity.VisualScripting;
 using Unity.VisualScripting.FullSerializer;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 using Random = UnityEngine.Random;
 
 public class LevelGenerator : MonoBehaviour
@@ -53,13 +55,18 @@ public class LevelGenerator : MonoBehaviour
     public List<GameObject> rightWalls = new();
     public List<GameObject> bottomWalls = new();
 
-    List<Coordinates> RoomPath = new();
+    List<Coordinates> RoomPath;
 
-    public Room[,] rooms = new Room[4, 4];
+    public Room[,] rooms;
+    List<Room> optionalRooms;
 
     // Start is called before the first frame update
     void Start()
     {
+        RoomPath = new();
+        rooms = new Room[4, 4];
+        optionalRooms = new();
+
         var board = GenerateRoomPath();
 
         Debug.Log($"{board[0, 3]} {board[1, 3]} {board[2, 3]} {board[3, 3]}");
@@ -74,7 +81,7 @@ public class LevelGenerator : MonoBehaviour
             xP = xStart;
             for (int x = 0; x < 4; x++)
             {
-                var r = (BuildARoom(xP, yP, (RoomType)board[x, y]));
+                var r = BuildARoom(xP, yP, (RoomType)board[x, y], 30);
                 r.X = x;
                 r.Y = y;
                 rooms[x, y] = r;
@@ -93,17 +100,187 @@ public class LevelGenerator : MonoBehaviour
                 }
             }
         }
+        Coordinates startRoom = RoomPath.First();
+        Coordinates endRoom = RoomPath.Last();
+        Room roomUnder = null;
+        if (startRoom.y > 0)
+        {
+            roomUnder = rooms[startRoom.x, startRoom.y - 1];
+        }
+        PutEntrance(rooms[startRoom.x, startRoom.y], roomUnder);
+        PutExit(rooms[endRoom.x, endRoom.y]);
 
-        // calculate the path and make sure there is an available path build exits
-
-        //BuildARoom(xP, yP, 0);
-        //BuildWalls();
-        //DigOutWalls();
-
-
+        BreakingUpRandomGrid();
+        GenerateLadders();
+        GenerateItems();
+        GenerateDamsel();
     }
 
-    Room BuildARoom(float xS, float yS, RoomType type)
+    void GenerateItems()
+    {
+        foreach (var r in rooms)
+        {
+            if (Random.Range(1, 6) != 1)
+            {
+                continue;
+            }
+
+            Coordinates pos;
+            if (r.Y == 0)
+            {
+                pos = GetDoorPosition(r, null);
+            }
+            else
+            {
+                pos = GetDoorPosition(r, rooms[r.X, r.Y - 1]);
+            }
+
+            r.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Coin);
+        }
+    }
+
+    void GenerateLadders()
+    {
+        foreach (var r in rooms)
+        {
+            var grid = r.Grid;
+
+            for (int x = 0; x < 10; x++)
+            {
+                for (int y = 0; y < 5; y++)
+                {
+                    if (grid[x, y].GetComponent<TileScript>().Type == TileType.Dirt
+                        && grid[x, y + 1].GetComponent<TileScript>().Type == TileType.Dirt
+                        && grid[x, y + 2].GetComponent<TileScript>().Type == TileType.Dirt
+                        && grid[x, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
+                    {
+                        if (x is not 9)
+                        {
+                            if (grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                                && grid[x + 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
+                                && grid[x + 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty)
+                            {
+                                grid[x + 1, y].GetComponent<TileScript>().Create(TileType.Ladder);
+                                grid[x + 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
+                                grid[x + 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                            }
+                        }
+                        else if (x is not 0)
+                        {
+                            if (grid[x - 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                                && grid[x - 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
+                                && grid[x - 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty)
+                            {
+                                grid[x - 1, y].GetComponent<TileScript>().Create(TileType.Ladder);
+                                grid[x - 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
+                                grid[x - 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void GenerateDamsel()
+    {
+        var path = RoomPath.ToList();
+        path.Remove(path.First());
+        path.Remove(path.Last());
+
+        var chosenRoom = path[Random.Range(0, path.Count)];
+
+        Room roomUnder = null;
+        if(chosenRoom.y > 0)
+        {
+            roomUnder = rooms[chosenRoom.x, chosenRoom.y - 1];
+        }
+
+        var damselPos = GetDoorPosition(rooms[chosenRoom.x, chosenRoom.y], roomUnder);
+        rooms[chosenRoom.x, chosenRoom.y].Grid[damselPos.x, damselPos.y].GetComponent<TileScript>().Create(TileType.Damsel);
+    }
+
+    public void RegenerateLevel()
+    {
+        foreach (var room in rooms)
+        {
+            if (room is not null)
+            {
+                foreach (var t in room.Grid)
+                {
+                    Destroy(t);
+                }
+            }
+        }
+        foreach (var room in optionalRooms)
+        {
+            if (room is not null)
+            {
+                foreach (var t in room.Grid)
+                {
+                    Destroy(t);
+                }
+            }
+        }
+        Start();
+    }
+
+    void BreakingUpRandomGrid()
+    {
+        var randomY = Random.Range(0, 4);
+        var randomX = Random.Range(1, 3);
+        if (randomX == 1)
+        {
+            optionalRooms.Add(BuildARoom(-9.5f, 0.5f + randomY * 8, RoomType.Random, 40));
+        }
+        else if (randomX == 2)
+        {
+            optionalRooms.Add(BuildARoom(40.5f, 0.5f + randomY * 8, RoomType.Random, 40));
+        }
+    }
+    void PutEntrance(Room room, Room roomUnder)
+    {
+        var pos = GetDoorPosition(room, roomUnder);
+        room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.EntranceExit);
+    }
+
+    void PutExit(Room room)
+    {
+        var pos = GetDoorPosition(room, null);
+        room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.EntranceExit);
+    }
+
+    Coordinates GetDoorPosition(Room room, Room roomUnder)
+    {
+        List<Coordinates> availablePos = new();
+        for (int x = 0; x < 10; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                if (y == 0)
+                {
+                    if (roomUnder is not null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && roomUnder.Grid[x, 7].GetComponent<TileScript>().Type == TileType.Dirt)
+                    {
+                        availablePos.Add(new Coordinates { x = x, y = y });
+                    }
+                    else if (roomUnder is null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty)
+                    {
+                        availablePos.Add(new Coordinates { x = x, y = y });
+                    }
+                }
+                else if (room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && room.Grid[x, y - 1].GetComponent<TileScript>().Type == TileType.Dirt)
+                {
+                    availablePos.Add(new Coordinates { x = x, y = y });
+                }
+            }
+        }
+        Coordinates doorPos = availablePos[Random.Range(0, availablePos.Count)];
+        Debug.Log(availablePos.Count);
+        return doorPos;
+        //room.Grid[doorPos.x, doorPos.y].GetComponent<SpriteRenderer>().color = Color.red;
+    }
+
+    Room BuildARoom(float xS, float yS, RoomType type, int digCount)
     {
         Room roomToReturn = new();
         roomToReturn.Type = type;
@@ -117,6 +294,7 @@ public class LevelGenerator : MonoBehaviour
             for (int y = 0; y < height; y++)
             {
                 var obj = Instantiate(air);
+                obj.GetComponent<TileScript>().Create(TileType.Dirt);
                 obj.transform.position = new Vector2(xPos, yPos);
                 grid[x, y] = obj;
                 yPos += yMove;
@@ -124,7 +302,7 @@ public class LevelGenerator : MonoBehaviour
             xPos += xMove;
         }
 
-        roomToReturn.Grid = DigOutRoom(grid, 30, false, Random.Range(3, 5), Random.Range(4, 6));
+        roomToReturn.Grid = DigOutRoom(grid, digCount, false, Random.Range(3, 5), Random.Range(4, 6));
 
         return roomToReturn;
     }
@@ -134,18 +312,15 @@ public class LevelGenerator : MonoBehaviour
         int diggerX = startX;
         int diggerY = startY;
         int remainingDigs = digCount;
-        Color color = Color.white;
 
         if (DigUntilEmpty)
         {
             remainingDigs = 30;
-            color = Color.white;
         }
 
         List<GameObject> alreadyVisited = new();
 
-        grid[diggerX, diggerY].GetComponent<SpriteRenderer>().color = color;
-        grid[diggerX, diggerY].GetComponent<TileScript>().type = 2;
+        grid[diggerX, diggerY].GetComponent<TileScript>().Visited = true;
         alreadyVisited.Add(grid[diggerX, diggerY]);
         remainingDigs--;
 
@@ -164,21 +339,20 @@ public class LevelGenerator : MonoBehaviour
 
             if (DigUntilEmpty)
             {
-                if (grid[diggerX, diggerY].GetComponent<TileScript>().type == 1)
+                if (grid[diggerX, diggerY].GetComponent<TileScript>().Type == TileType.Empty)
                 {
                     foreach (var v in alreadyVisited)
                     {
-                        v.GetComponent<TileScript>().type = 1;
+                        v.GetComponent<TileScript>().Create(TileType.Empty);
                     }
 
                     return grid;
                 }
             }
 
-            if (grid[diggerX, diggerY].GetComponent<TileScript>().type != 2)
+            if (grid[diggerX, diggerY].GetComponent<TileScript>().Visited == false)
             {
-                grid[diggerX, diggerY].GetComponent<SpriteRenderer>().color = color;
-                grid[diggerX, diggerY].GetComponent<TileScript>().type = 2;
+                grid[diggerX, diggerY].GetComponent<TileScript>().Visited = true;
                 alreadyVisited.Add(grid[diggerX, diggerY]);
                 remainingDigs--;
             }
@@ -186,7 +360,7 @@ public class LevelGenerator : MonoBehaviour
 
         foreach (var v in alreadyVisited)
         {
-            v.GetComponent<TileScript>().type = 1;
+            v.GetComponent<TileScript>().Create(TileType.Empty);
         }
 
         return grid;
@@ -433,7 +607,7 @@ public class LevelGenerator : MonoBehaviour
 
             for (int i = 0; i < height; i++)
             {
-                if ((currentTiles[9, i].GetComponent<TileScript>().type == 1) && (rightTiles[0, i].GetComponent<TileScript>().type == 1))
+                if ((currentTiles[9, i].GetComponent<TileScript>().Type == TileType.Empty) && (rightTiles[0, i].GetComponent<TileScript>().Type == TileType.Empty))
                 {
                     rightExitGenerated = true;
                 }
@@ -450,7 +624,7 @@ public class LevelGenerator : MonoBehaviour
                     {
                         for (int j = 0; j < height; j++)
                         {
-                            if (currentTiles[i, j].GetComponent<TileScript>().type == 1)
+                            if (currentTiles[i, j].GetComponent<TileScript>().Type == TileType.Empty)
                             {
                                 rightMostRow = i;
                                 found = true;
@@ -461,12 +635,11 @@ public class LevelGenerator : MonoBehaviour
                 }
 
                 int k = rightMostIndexes[Random.Range(0, rightMostIndexes.Count)];
-                if (currentTiles[rightMostRow, k].GetComponent<TileScript>().type == 1)
+                if (currentTiles[rightMostRow, k].GetComponent<TileScript>().Type == TileType.Empty)
                 {
                     while (rightMostRow < width)
                     {
-                        currentTiles[rightMostRow, k].GetComponent<SpriteRenderer>().color = Color.white;
-                        currentTiles[rightMostRow, k].GetComponent<TileScript>().type = 1;
+                        currentTiles[rightMostRow, k].GetComponent<TileScript>().Create(TileType.Empty);
                         rightMostRow++;
                     }
                 }
@@ -481,7 +654,7 @@ public class LevelGenerator : MonoBehaviour
 
             for (int i = 0; i < height; i++)
             {
-                if ((currentTiles[0, i].GetComponent<TileScript>().type == 1) && (leftTiles[9, i].GetComponent<TileScript>().type == 1))
+                if ((currentTiles[0, i].GetComponent<TileScript>().Type == TileType.Empty) && (leftTiles[9, i].GetComponent<TileScript>().Type == TileType.Empty))
                 {
                     leftExitGenerated = true;
                 }
@@ -498,7 +671,7 @@ public class LevelGenerator : MonoBehaviour
                     {
                         for (int j = 0; j < height; j++)
                         {
-                            if (currentTiles[j, i].GetComponent<TileScript>().type == 1)
+                            if (currentTiles[j, i].GetComponent<TileScript>().Type == TileType.Empty)
                             {
                                 leftMostRow = i;
                                 found = true;
@@ -509,12 +682,11 @@ public class LevelGenerator : MonoBehaviour
                 }
 
                 int k = leftMostIndexes[Random.Range(0, leftMostIndexes.Count)];
-                if (currentTiles[leftMostRow, k].GetComponent<TileScript>().type == 1)
+                if (currentTiles[leftMostRow, k].GetComponent<TileScript>().Type == TileType.Empty)
                 {
                     while (leftMostRow >= 0)
                     {
-                        currentTiles[leftMostRow, k].GetComponent<SpriteRenderer>().color = Color.white;
-                        currentTiles[leftMostRow, k].GetComponent<TileScript>().type = 1;
+                        currentTiles[leftMostRow, k].GetComponent<TileScript>().Create(TileType.Empty);
                         leftMostRow--;
                     }
                 }
@@ -529,7 +701,7 @@ public class LevelGenerator : MonoBehaviour
 
             for (int i = 0; i < width; i++)
             {
-                if ((currentTiles[i, 7].GetComponent<TileScript>().type == 1) && (topTiles[i, 0].GetComponent<TileScript>().type == 1))
+                if ((currentTiles[i, 7].GetComponent<TileScript>().Type == TileType.Empty) && (topTiles[i, 0].GetComponent<TileScript>().Type == TileType.Empty))
                 {
                     topExitGenerated = true;
                 }
@@ -546,7 +718,7 @@ public class LevelGenerator : MonoBehaviour
                     {
                         for (int j = 0; j < width; j++)
                         {
-                            if (currentTiles[j, i].GetComponent<TileScript>().type == 1)
+                            if (currentTiles[j, i].GetComponent<TileScript>().Type == TileType.Empty)
                             {
                                 topMostCol = i;
                                 found = true;
@@ -557,12 +729,11 @@ public class LevelGenerator : MonoBehaviour
                 }
 
                 int k = topMostIndexes[Random.Range(0, topMostIndexes.Count)];
-                if (currentTiles[k, topMostCol].GetComponent<TileScript>().type == 1)
+                if (currentTiles[k, topMostCol].GetComponent<TileScript>().Type == TileType.Empty)
                 {
                     while (topMostCol < height)
                     {
-                        currentTiles[k, topMostCol].GetComponent<SpriteRenderer>().color = Color.white;
-                        currentTiles[k, topMostCol].GetComponent<TileScript>().type = 1;
+                        currentTiles[k, topMostCol].GetComponent<TileScript>().Create(TileType.Empty);
                         topMostCol++;
                     }
                 }
@@ -577,7 +748,7 @@ public class LevelGenerator : MonoBehaviour
 
             for (int i = 0; i < width; i++)
             {
-                if ((currentTiles[i, 0].GetComponent<TileScript>().type == 1) && (bottomTiles[i, 7].GetComponent<TileScript>().type == 1))
+                if ((currentTiles[i, 0].GetComponent<TileScript>().Type == TileType.Empty) && (bottomTiles[i, 7].GetComponent<TileScript>().Type == TileType.Empty))
                 {
                     bottomExitGenerated = true;
                 }
@@ -594,7 +765,7 @@ public class LevelGenerator : MonoBehaviour
                     {
                         for (int j = 0; j < width; j++)
                         {
-                            if (currentTiles[j, i].GetComponent<TileScript>().type == 1)
+                            if (currentTiles[j, i].GetComponent<TileScript>().Type == TileType.Empty)
                             {
                                 bottomMostCol = i;
                                 found = true;
@@ -605,358 +776,16 @@ public class LevelGenerator : MonoBehaviour
                 }
 
                 int k = bottomMostIndexes[Random.Range(0, bottomMostIndexes.Count)];
-                if (currentTiles[k, bottomMostCol].GetComponent<TileScript>().type == 1)
+                if (currentTiles[k, bottomMostCol].GetComponent<TileScript>().Type == TileType.Empty)
                 {
                     while (bottomMostCol >= 0)
                     {
-                        currentTiles[k, bottomMostCol].GetComponent<SpriteRenderer>().color = Color.white;
-                        currentTiles[k, bottomMostCol].GetComponent<TileScript>().type = 1;
+                        currentTiles[k, bottomMostCol].GetComponent<TileScript>().Create(TileType.Empty);
                         bottomMostCol--;
                     }
                 }
 
                 DigOutRoom(bottomTiles, 0, true, k, 7);
-            }
-        }
-    }
-
-    void DigOutWalls(Room room, int x, int y)
-    {
-        bool hasExitRight = false;
-        bool hasExitLeft = false;
-        bool hasExitTop = false;
-        bool hasExitBottom = false;
-
-        bool rightExitGenerated = false;
-        bool leftExitGenerated = false;
-        bool topExitGenerated = false;
-        bool bottomExitGenerated = false;
-
-        var currentTiles = rooms[x, y].Grid;
-
-        switch (room.Type)
-        {
-            case RoomType.Random:
-                break;
-            case RoomType.Corridor:
-                hasExitLeft = true;
-                hasExitRight = true;
-                break;
-            case RoomType.DropFrom:
-                hasExitLeft = true;
-                hasExitRight = true;
-                hasExitBottom = true;
-                //hasExitTop = true;
-                break;
-            case RoomType.DropTo:
-                hasExitLeft = true;
-                hasExitRight = true;
-                hasExitTop = true;
-                break;
-        }
-
-        if (x is 0)
-        {
-            hasExitLeft = false;
-        }
-        if (x is 3)
-        {
-            hasExitRight = false;
-        }
-        if (y is 0)
-        {
-            hasExitBottom = false;
-        }
-        if (y is 3)
-        {
-            hasExitTop = false;
-        }
-
-        if (hasExitRight)
-        {
-            var rightTiles = rooms[x + 1, y].Grid;
-
-            for (int i = 0; i < height; i++)
-            {
-                if ((currentTiles[9, i].GetComponent<TileScript>().type == 1) && (rightTiles[0, i].GetComponent<TileScript>().type == 1))
-                {
-                    rightExitGenerated = true;
-                }
-            }
-
-            if (!rightExitGenerated)
-            {
-                int rightMostRow = 0;
-                bool found = false;
-                List<int> rightMostIndexes = new();
-                for (int i = width - 1; i > 0; i--)
-                {
-                    if (!found)
-                    {
-                        for (int j = 0; j < height; j++)
-                        {
-                            if (currentTiles[i, j].GetComponent<TileScript>().type == 1)
-                            {
-                                rightMostRow = i;
-                                found = true;
-                                rightMostIndexes.Add(j);
-                            }
-                        }
-                    }
-                }
-
-                int k = rightMostIndexes[Random.Range(0, rightMostIndexes.Count)];
-                if (currentTiles[rightMostRow, k].GetComponent<TileScript>().type == 1)
-                {
-                    while (rightMostRow < width)
-                    {
-                        currentTiles[rightMostRow, k].GetComponent<SpriteRenderer>().color = Color.yellow;
-                        currentTiles[rightMostRow, k].GetComponent<TileScript>().type = 1;
-                        rightMostRow++;
-                    }
-                }
-
-                int xR = 0;
-                while (!rightExitGenerated)
-                {
-                    if (rightTiles[xR, k].GetComponent<TileScript>().type == 0 && xR is not 9)
-                    {
-                        if (k is not 0 && xR > 0 && rightTiles[xR - 1, k - 1].GetComponent<TileScript>().type == 1)
-                        {
-                            rightExitGenerated = true;
-                        }
-                        else if (k is not 7 && xR > 0 && rightTiles[xR - 1, k + 1].GetComponent<TileScript>().type == 1)
-                        {
-                            rightExitGenerated = true;
-                        }
-                        else
-                        {
-                            rightTiles[xR, k].GetComponent<SpriteRenderer>().color = Color.blue;
-                            rightTiles[xR, k].GetComponent<TileScript>().type = 1;
-                            xR++;
-                        }
-                    }
-                    else
-                    {
-                        rightExitGenerated = true;
-                    }
-                }
-            }
-        }
-
-        if (hasExitLeft)
-        {
-            var leftTiles = rooms[x - 1, y].Grid;
-
-            for (int i = 0; i < height; i++)
-            {
-                if ((currentTiles[0, i].GetComponent<TileScript>().type == 1) && (leftTiles[9, i].GetComponent<TileScript>().type == 1))
-                {
-                    leftExitGenerated = true;
-                }
-            }
-
-            if (!leftExitGenerated)
-            {
-                int leftMostRow = 9;
-                bool found = false;
-                List<int> leftMostIndexes = new();
-                for (int i = 0; i < width; i++)
-                {
-                    if (!found)
-                    {
-                        for (int j = 0; j < height; j++)
-                        {
-                            if (currentTiles[j, i].GetComponent<TileScript>().type == 1)
-                            {
-                                leftMostRow = i;
-                                found = true;
-                                leftMostIndexes.Add(j);
-                            }
-                        }
-                    }
-                }
-
-                int k = leftMostIndexes[Random.Range(0, leftMostIndexes.Count)];
-                if (currentTiles[leftMostRow, k].GetComponent<TileScript>().type == 1)
-                {
-                    while (leftMostRow >= 0)
-                    {
-                        currentTiles[leftMostRow, k].GetComponent<SpriteRenderer>().color = Color.green;
-                        currentTiles[leftMostRow, k].GetComponent<TileScript>().type = 1;
-                        leftMostRow--;
-                    }
-                }
-
-                int xR = 9;
-                while (!leftExitGenerated)
-                {
-                    if (leftTiles[xR, k].GetComponent<TileScript>().type == 0 && xR is not 0)
-                    {
-                        if (k is not 0 && xR < 9 && leftTiles[xR + 1, k - 1].GetComponent<TileScript>().type == 1)
-                        {
-                            leftExitGenerated = true;
-                        }
-                        else if (k is not 7 && xR < 9 && leftTiles[xR + 1, k + 1].GetComponent<TileScript>().type == 1)
-                        {
-                            leftExitGenerated = true;
-                        }
-                        else
-                        {
-                            leftTiles[xR, k].GetComponent<SpriteRenderer>().color = Color.red;
-                            leftTiles[xR, k].GetComponent<TileScript>().type = 1;
-                            xR--;
-                        }
-                    }
-                    else
-                    {
-                        leftExitGenerated = true;
-                    }
-                }
-            }
-        }
-
-        if (hasExitTop)
-        {
-            var topTiles = rooms[x, y + 1].Grid;
-
-            for (int i = 0; i < width; i++)
-            {
-                if ((currentTiles[i, 7].GetComponent<TileScript>().type == 1) && (topTiles[i, 0].GetComponent<TileScript>().type == 1))
-                {
-                    topExitGenerated = true;
-                }
-            }
-
-            if (!topExitGenerated)
-            {
-                int topMostCol = 0;
-                bool found = false;
-                List<int> topMostIndexes = new();
-                for (int i = height - 1; i > 0; i--)
-                {
-                    if (!found)
-                    {
-                        for (int j = 0; j < width; j++)
-                        {
-                            if (currentTiles[j, i].GetComponent<TileScript>().type == 1)
-                            {
-                                topMostCol = i;
-                                found = true;
-                                topMostIndexes.Add(j);
-                            }
-                        }
-                    }
-                }
-
-                int k = topMostIndexes[Random.Range(0, topMostIndexes.Count)];
-                if (currentTiles[k, topMostCol].GetComponent<TileScript>().type == 1)
-                {
-                    while (topMostCol < height)
-                    {
-                        currentTiles[k, topMostCol].GetComponent<SpriteRenderer>().color = Color.gray;
-                        currentTiles[k, topMostCol].GetComponent<TileScript>().type = 1;
-                        topMostCol++;
-                    }
-                }
-
-                int yR = 0;
-                while (!topExitGenerated)
-                {
-                    if (topTiles[k, yR].GetComponent<TileScript>().type == 0 && yR is not 7)
-                    {
-                        if (k is not 0 && yR > 0 && topTiles[k - 1, yR - 1].GetComponent<TileScript>().type == 1)
-                        {
-                            topExitGenerated = true;
-                        }
-                        else if (k is not 9 && yR > 0 && topTiles[k + 1, yR - 1].GetComponent<TileScript>().type == 1)
-                        {
-                            topExitGenerated = true;
-                        }
-                        else
-                        {
-                            topTiles[k, yR].GetComponent<SpriteRenderer>().color = Color.magenta;
-                            topTiles[k, yR].GetComponent<TileScript>().type = 1;
-                            yR++;
-                        }
-                    }
-                    else
-                    {
-                        topExitGenerated = true;
-                    }
-                }
-            }
-        }
-
-        if (hasExitBottom)
-        {
-            var bottomTiles = rooms[x, y - 1].Grid;
-
-            for (int i = 0; i < width; i++)
-            {
-                if ((currentTiles[i, 0].GetComponent<TileScript>().type == 1) && (bottomTiles[i, 7].GetComponent<TileScript>().type == 1))
-                {
-                    bottomExitGenerated = true;
-                }
-            }
-
-            if (!bottomExitGenerated)
-            {
-                int bottomMostCol = 7;
-                bool found = false;
-                List<int> bottomMostIndexes = new();
-                for (int i = 0; i < height; i++)
-                {
-                    if (!found)
-                    {
-                        for (int j = 0; j < width; j++)
-                        {
-                            if (currentTiles[j, i].GetComponent<TileScript>().type == 1)
-                            {
-                                bottomMostCol = i;
-                                found = true;
-                                bottomMostIndexes.Add(j);
-                            }
-                        }
-                    }
-                }
-
-                int k = bottomMostIndexes[Random.Range(0, bottomMostIndexes.Count)];
-                if (currentTiles[k, bottomMostCol].GetComponent<TileScript>().type == 1)
-                {
-                    while (bottomMostCol >= 0)
-                    {
-                        currentTiles[k, bottomMostCol].GetComponent<SpriteRenderer>().color = Color.black;
-                        currentTiles[k, bottomMostCol].GetComponent<TileScript>().type = 1;
-                        bottomMostCol--;
-                    }
-                }
-
-                int yR = 7;
-                while (!bottomExitGenerated)
-                {
-                    if (bottomTiles[k, yR].GetComponent<TileScript>().type == 0 && yR is not 0)
-                    {
-                        if (k is not 9 && yR < 7 && bottomTiles[k + 1, yR + 1].GetComponent<TileScript>().type == 1)
-                        {
-                            bottomExitGenerated = true;
-                        }
-                        else if (k is not 0 && yR < 7 && bottomTiles[k - 1, yR + 1].GetComponent<TileScript>().type == 1)
-                        {
-                            bottomExitGenerated = true;
-                        }
-                        else
-                        {
-                            bottomTiles[k, yR].GetComponent<SpriteRenderer>().color = new Color32(14, 100, 150, 200);
-                            bottomTiles[k, yR].GetComponent<TileScript>().type = 1;
-                            yR--;
-                        }
-                    }
-                    else
-                    {
-                        bottomExitGenerated = true;
-                    }
-                }
             }
         }
     }
