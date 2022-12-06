@@ -9,6 +9,7 @@ using Unity.VisualScripting.FullSerializer;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using static LevelGenerator;
 using Random = UnityEngine.Random;
 
 public class LevelGenerator : MonoBehaviour
@@ -21,10 +22,10 @@ public class LevelGenerator : MonoBehaviour
         DropTo = 3
     }
 
-    struct Coordinates
+    public class Coordinates
     {
-        public int x;
-        public int y;
+        public int x { get; set; }
+        public int y { get; set; }
     }
 
     public class Room
@@ -114,6 +115,104 @@ public class LevelGenerator : MonoBehaviour
         GenerateLadders();
         GenerateItems();
         GenerateDamsel();
+        GenerateBats();
+        GenerateSpikes();
+        GenerateSnakes();
+    }
+
+    void GenerateBats()
+    {
+        foreach (var r in rooms)
+        {
+            if (Random.Range(1, 9) != 1) // 12.5% per room to have a bat
+            {
+                continue;
+            }
+
+            Coordinates pos;
+            if (r.Y == 3)
+            {
+                pos = GetPositionOnRoof(r, null);
+            }
+            else
+            {
+                pos = GetPositionOnRoof(r, rooms[r.X, r.Y + 1]);
+            }
+
+            if (pos is null)
+            {
+                return;
+            }
+
+            r.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Bat);
+        }
+    }
+
+    void GenerateSnakes()
+    {
+        foreach (var r in rooms)
+        {
+            var grid = r.Grid;
+
+            for (int x = 0; x < 8; x++)
+            {
+                for (int y = 0; y < 4; y++)
+                {
+                    if (grid[x, y].GetComponent<TileScript>().Type == TileType.Empty
+                        && grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                        && grid[x + 2, y].GetComponent<TileScript>().Type == TileType.Empty)
+                    {
+                        if(Random.Range(1,4) != 1)
+                        {
+                            continue;
+                        }
+
+                        if (y is 0 && r.Y is not 0)
+                        {
+                            var bottomGrid = rooms[r.X,r.Y - 1].Grid;
+                            if (bottomGrid[x, 7].GetComponent<TileScript>().Type == TileType.Dirt
+                                && bottomGrid[x + 1, 7].GetComponent<TileScript>().Type == TileType.Dirt
+                                && bottomGrid[x + 2, 7].GetComponent<TileScript>().Type == TileType.Dirt)
+                            {
+                                grid[x + Random.Range(0, 3), y].GetComponent<TileScript>().Create(TileType.Snake);
+                            }
+                        }
+                        else if (y is 0 && r.Y is 0)
+                        {
+                            grid[x + Random.Range(0, 3), y].GetComponent<TileScript>().Create(TileType.Snake);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void GenerateSpikes()
+    {
+        foreach (var r in rooms)
+        {
+            if (Random.Range(1, 6) != 1)
+            {
+                continue;
+            }
+
+            Coordinates pos;
+            if (r.Y == 0)
+            {
+                pos = GetPositionOnGround(r, null, 3);
+            }
+            else
+            {
+                pos = GetPositionOnGround(r, rooms[r.X, r.Y - 1], 3);
+            }
+
+            if (pos is null)
+            {
+                return;
+            }
+
+            r.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Spike);
+        }
     }
 
     void GenerateItems()
@@ -128,14 +227,26 @@ public class LevelGenerator : MonoBehaviour
             Coordinates pos;
             if (r.Y == 0)
             {
-                pos = GetDoorPosition(r, null);
+                pos = GetPositionOnGround(r, null, 8);
             }
             else
             {
-                pos = GetDoorPosition(r, rooms[r.X, r.Y - 1]);
+                pos = GetPositionOnGround(r, rooms[r.X, r.Y - 1], 8);
             }
 
-            r.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Coin);
+            if(pos is null)
+            {
+                return;
+            }
+
+            TileType typeToCreate = TileType.Coin;
+
+            if(Random.Range(1,4) == 1)
+            {
+                typeToCreate = TileType.Bomb;
+            }
+
+            r.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(typeToCreate);
         }
     }
 
@@ -147,33 +258,33 @@ public class LevelGenerator : MonoBehaviour
 
             for (int x = 0; x < 10; x++)
             {
-                for (int y = 0; y < 5; y++)
+                for (int y = 0; y < 4; y++)
                 {
-                    if (grid[x, y].GetComponent<TileScript>().Type == TileType.Dirt
-                        && grid[x, y + 1].GetComponent<TileScript>().Type == TileType.Dirt
-                        && grid[x, y + 2].GetComponent<TileScript>().Type == TileType.Dirt
-                        && grid[x, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
+                    if (grid[x, y + 3].GetComponent<TileScript>().Type == TileType.Dirt
+                        && grid[x, y + 4].GetComponent<TileScript>().Type == TileType.Empty)
                     {
                         if (x is not 9)
                         {
-                            if (grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                            if (grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Dirt
                                 && grid[x + 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
-                                && grid[x + 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty)
+                                && grid[x + 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty
+                                && grid[x + 1, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
                             {
-                                grid[x + 1, y].GetComponent<TileScript>().Create(TileType.Ladder);
                                 grid[x + 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
                                 grid[x + 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                                grid[x + 1, y + 3].GetComponent<TileScript>().Create(TileType.Ladder);
                             }
                         }
                         else if (x is not 0)
                         {
-                            if (grid[x - 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                            if (grid[x - 1, y].GetComponent<TileScript>().Type == TileType.Dirt
                                 && grid[x - 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
-                                && grid[x - 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty)
+                                && grid[x - 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty
+                                && grid[x - 1, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
                             {
-                                grid[x - 1, y].GetComponent<TileScript>().Create(TileType.Ladder);
                                 grid[x - 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
                                 grid[x - 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                                grid[x - 1, y + 3].GetComponent<TileScript>().Create(TileType.Ladder);
                             }
                         }
                     }
@@ -196,7 +307,7 @@ public class LevelGenerator : MonoBehaviour
             roomUnder = rooms[chosenRoom.x, chosenRoom.y - 1];
         }
 
-        var damselPos = GetDoorPosition(rooms[chosenRoom.x, chosenRoom.y], roomUnder);
+        var damselPos = GetPositionOnGround(rooms[chosenRoom.x, chosenRoom.y], roomUnder, 8);
         rooms[chosenRoom.x, chosenRoom.y].Grid[damselPos.x, damselPos.y].GetComponent<TileScript>().Create(TileType.Damsel);
     }
 
@@ -240,22 +351,57 @@ public class LevelGenerator : MonoBehaviour
     }
     void PutEntrance(Room room, Room roomUnder)
     {
-        var pos = GetDoorPosition(room, roomUnder);
+        var pos = GetPositionOnGround(room, roomUnder, 8);
         room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.EntranceExit);
     }
 
     void PutExit(Room room)
     {
-        var pos = GetDoorPosition(room, null);
+        var pos = GetPositionOnGround(room, null, 8);
         room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.EntranceExit);
     }
 
-    Coordinates GetDoorPosition(Room room, Room roomUnder)
+    Coordinates GetPositionOnRoof(Room room, Room roomAbove)
     {
         List<Coordinates> availablePos = new();
         for (int x = 0; x < 10; x++)
         {
-            for (int y = 0; y < 8; y++)
+            for (int y = 5; y < 8; y++)
+            {
+                if (y == 7)
+                {
+                    if (roomAbove is not null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && roomAbove.Grid[x, 0].GetComponent<TileScript>().Type == TileType.Dirt)
+                    {
+                        availablePos.Add(new Coordinates { x = x, y = y });
+                    }
+                    else if (roomAbove is null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty)
+                    {
+                        availablePos.Add(new Coordinates { x = x, y = y });
+                    }
+                }
+                else if (room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && room.Grid[x, y + 1].GetComponent<TileScript>().Type == TileType.Dirt)
+                {
+                    availablePos.Add(new Coordinates { x = x, y = y });
+                }
+            }
+        }
+
+        if(availablePos.Count == 0)
+        {
+            return null;
+        }
+
+        Coordinates roofPos = availablePos[Random.Range(0, availablePos.Count)];
+
+        return roofPos;
+    }
+
+    Coordinates GetPositionOnGround(Room room, Room roomUnder, int maxHeight)
+    {
+        List<Coordinates> availablePos = new();
+        for (int x = 0; x < 10; x++)
+        {
+            for (int y = 0; y < maxHeight; y++) // maxHeight 8 means position can be in any height
             {
                 if (y == 0)
                 {
@@ -274,10 +420,15 @@ public class LevelGenerator : MonoBehaviour
                 }
             }
         }
-        Coordinates doorPos = availablePos[Random.Range(0, availablePos.Count)];
-        Debug.Log(availablePos.Count);
-        return doorPos;
-        //room.Grid[doorPos.x, doorPos.y].GetComponent<SpriteRenderer>().color = Color.red;
+
+        if (availablePos.Count == 0)
+        {
+            return null;
+        }
+
+        Coordinates groundPos = availablePos[Random.Range(0, availablePos.Count)];
+
+        return groundPos;
     }
 
     Room BuildARoom(float xS, float yS, RoomType type, int digCount)

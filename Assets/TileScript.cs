@@ -34,11 +34,13 @@ public class TileScript : MonoBehaviour
                 sprite.color = Color.blue;
                 break;
             case TileType.Spike:
+                sprite.color = new Color(1f, 0.55f, 0);
                 break;
             case TileType.Ladder:
                 sprite.color = Color.gray;
                 break;
             case TileType.Bomb:
+                sprite.color = new Color(0.1f, 0.1f, 0.1f);
                 break;
             case TileType.Coin:
                 sprite.color = Color.yellow;
@@ -47,10 +49,21 @@ public class TileScript : MonoBehaviour
                 sprite.color = Color.red;
                 break;
             case TileType.Snake:
+                sprite.color = Color.green;
                 break;
             case TileType.Bat:
+                sprite.color = new Color(0.1f, 0.1f, 0.4f);
                 break;
         }
+    }
+
+    public bool IsSolid()
+    {
+        return Type switch
+        {
+            TileType.Dirt or TileType.Spike => true,
+            _ => false,
+        };
     }
 }
 
