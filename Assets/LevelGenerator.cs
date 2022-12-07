@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using TMPro;
 using Unity.Mathematics;
 using Unity.VisualScripting;
 using Unity.VisualScripting.FullSerializer;
@@ -57,14 +58,17 @@ public class LevelGenerator : MonoBehaviour
     public List<GameObject> bottomWalls = new();
 
     List<Coordinates> RoomPath;
+    public List<GameObject> TilePath;
 
     public Room[,] rooms;
     List<Room> optionalRooms;
+
 
     // Start is called before the first frame update
     void Start()
     {
         RoomPath = new();
+        TilePath = new();
         rooms = new Room[4, 4];
         optionalRooms = new();
 
@@ -118,6 +122,7 @@ public class LevelGenerator : MonoBehaviour
         GenerateBats();
         GenerateSpikes();
         GenerateSnakes();
+        PathFindUsingBreadthFirstSearch();
     }
 
     void GenerateBats()
@@ -162,14 +167,14 @@ public class LevelGenerator : MonoBehaviour
                         && grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Empty
                         && grid[x + 2, y].GetComponent<TileScript>().Type == TileType.Empty)
                     {
-                        if(Random.Range(1,4) != 1)
+                        if (Random.Range(1, 4) != 1)
                         {
                             continue;
                         }
 
                         if (y is 0 && r.Y is not 0)
                         {
-                            var bottomGrid = rooms[r.X,r.Y - 1].Grid;
+                            var bottomGrid = rooms[r.X, r.Y - 1].Grid;
                             if (bottomGrid[x, 7].GetComponent<TileScript>().Type == TileType.Dirt
                                 && bottomGrid[x + 1, 7].GetComponent<TileScript>().Type == TileType.Dirt
                                 && bottomGrid[x + 2, 7].GetComponent<TileScript>().Type == TileType.Dirt)
@@ -234,14 +239,14 @@ public class LevelGenerator : MonoBehaviour
                 pos = GetPositionOnGround(r, rooms[r.X, r.Y - 1], 8);
             }
 
-            if(pos is null)
+            if (pos is null)
             {
                 return;
             }
 
             TileType typeToCreate = TileType.Coin;
 
-            if(Random.Range(1,4) == 1)
+            if (Random.Range(1, 4) == 1)
             {
                 typeToCreate = TileType.Bomb;
             }
@@ -254,6 +259,13 @@ public class LevelGenerator : MonoBehaviour
     {
         foreach (var r in rooms)
         {
+            Room roomUnder = null;
+
+            if (r.Y > 0)
+            {
+                roomUnder = rooms[r.X, r.Y - 1];
+            }
+
             var grid = r.Grid;
 
             for (int x = 0; x < 10; x++)
@@ -265,26 +277,102 @@ public class LevelGenerator : MonoBehaviour
                     {
                         if (x is not 9)
                         {
-                            if (grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Dirt
-                                && grid[x + 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
-                                && grid[x + 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty
-                                && grid[x + 1, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
+                            if (y == 0)
                             {
-                                grid[x + 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
-                                grid[x + 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
-                                grid[x + 1, y + 3].GetComponent<TileScript>().Create(TileType.Ladder);
+                                if (roomUnder is not null || r.Y == 0)
+                                {
+                                    if ((r.Y == 0 || roomUnder.Grid[x + 1, 7].GetComponent<TileScript>().Type == TileType.Dirt)
+                                    && grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x + 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x + 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty)
+                                    {
+                                        grid[x + 1, y].GetComponent<TileScript>().Create(TileType.Ladder);
+                                        grid[x + 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
+                                        grid[x + 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if (grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Dirt
+                                    && grid[x + 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x + 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x + 1, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
+                                {
+                                    grid[x + 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
+                                    grid[x + 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                                    grid[x + 1, y + 3].GetComponent<TileScript>().Create(TileType.Ladder);
+                                }
                             }
                         }
                         else if (x is not 0)
                         {
-                            if (grid[x - 1, y].GetComponent<TileScript>().Type == TileType.Dirt
-                                && grid[x - 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
-                                && grid[x - 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty
-                                && grid[x - 1, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
+                            if (y == 0)
                             {
-                                grid[x - 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
-                                grid[x - 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
-                                grid[x - 1, y + 3].GetComponent<TileScript>().Create(TileType.Ladder);
+                                if (roomUnder is not null || r.Y == 0)
+                                {
+                                    if ((r.Y == 0 || roomUnder.Grid[x - 1, 7].GetComponent<TileScript>().Type == TileType.Dirt)
+                                    && grid[x - 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x - 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x - 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty)
+                                    {
+                                        grid[x - 1, y].GetComponent<TileScript>().Create(TileType.Ladder);
+                                        grid[x - 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
+                                        grid[x - 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if (grid[x - 1, y].GetComponent<TileScript>().Type == TileType.Dirt
+                                    && grid[x - 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x - 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x - 1, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
+                                {
+                                    grid[x - 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
+                                    grid[x - 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                                    grid[x - 1, y + 3].GetComponent<TileScript>().Create(TileType.Ladder);
+                                }
+                            }
+                        }
+                    }
+                    else if (grid[x, y + 2].GetComponent<TileScript>().Type == TileType.Dirt
+                        && grid[x, y + 3].GetComponent<TileScript>().Type == TileType.Empty)
+                    {
+                        if (x is not 9)
+                        {
+                            if (y == 0)
+                            {
+                                if (roomUnder is not null || r.Y == 0)
+                                {
+                                    if ((r.Y == 0 || roomUnder.Grid[x + 1, 7].GetComponent<TileScript>().Type == TileType.Dirt)
+                                    && grid[x + 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x + 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
+                                    && grid[x + 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty)
+                                    {
+                                        grid[x + 1, y].GetComponent<TileScript>().Create(TileType.Ladder);
+                                        grid[x + 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
+                                        grid[x + 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                                    }
+                                }
+                            }
+                            else if (x is not 0)
+                            {
+                                if (y == 0)
+                                {
+                                    if (roomUnder is not null || r.Y == 0)
+                                    {
+                                        if ((r.Y == 0 || roomUnder.Grid[x - 1, 7].GetComponent<TileScript>().Type == TileType.Dirt)
+                                        && grid[x - 1, y].GetComponent<TileScript>().Type == TileType.Empty
+                                        && grid[x - 1, y + 1].GetComponent<TileScript>().Type == TileType.Empty
+                                        && grid[x - 1, y + 2].GetComponent<TileScript>().Type == TileType.Empty)
+                                        {
+                                            grid[x - 1, y].GetComponent<TileScript>().Create(TileType.Ladder);
+                                            grid[x - 1, y + 1].GetComponent<TileScript>().Create(TileType.Ladder);
+                                            grid[x - 1, y + 2].GetComponent<TileScript>().Create(TileType.Ladder);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -293,391 +381,391 @@ public class LevelGenerator : MonoBehaviour
         }
     }
 
-    void GenerateDamsel()
-    {
-        var path = RoomPath.ToList();
-        path.Remove(path.First());
-        path.Remove(path.Last());
-
-        var chosenRoom = path[Random.Range(0, path.Count)];
-
-        Room roomUnder = null;
-        if(chosenRoom.y > 0)
-        {
-            roomUnder = rooms[chosenRoom.x, chosenRoom.y - 1];
-        }
-
-        var damselPos = GetPositionOnGround(rooms[chosenRoom.x, chosenRoom.y], roomUnder, 8);
-        rooms[chosenRoom.x, chosenRoom.y].Grid[damselPos.x, damselPos.y].GetComponent<TileScript>().Create(TileType.Damsel);
-    }
-
-    public void RegenerateLevel()
-    {
-        foreach (var room in rooms)
-        {
-            if (room is not null)
+            void GenerateDamsel()
             {
-                foreach (var t in room.Grid)
+                var path = RoomPath.ToList();
+                path.Remove(path.First());
+                path.Remove(path.Last());
+
+                var chosenRoom = path[Random.Range(0, path.Count)];
+
+                Room roomUnder = null;
+                if (chosenRoom.y > 0)
                 {
-                    Destroy(t);
+                    roomUnder = rooms[chosenRoom.x, chosenRoom.y - 1];
                 }
+
+                var damselPos = GetPositionOnGround(rooms[chosenRoom.x, chosenRoom.y], roomUnder, 8);
+                rooms[chosenRoom.x, chosenRoom.y].Grid[damselPos.x, damselPos.y].GetComponent<TileScript>().Create(TileType.Damsel);
             }
-        }
-        foreach (var room in optionalRooms)
-        {
-            if (room is not null)
+
+            public void RegenerateLevel()
             {
-                foreach (var t in room.Grid)
+                foreach (var room in rooms)
                 {
-                    Destroy(t);
-                }
-            }
-        }
-        Start();
-    }
-
-    void BreakingUpRandomGrid()
-    {
-        var randomY = Random.Range(0, 4);
-        var randomX = Random.Range(1, 3);
-        if (randomX == 1)
-        {
-            optionalRooms.Add(BuildARoom(-9.5f, 0.5f + randomY * 8, RoomType.Random, 40));
-        }
-        else if (randomX == 2)
-        {
-            optionalRooms.Add(BuildARoom(40.5f, 0.5f + randomY * 8, RoomType.Random, 40));
-        }
-    }
-    void PutEntrance(Room room, Room roomUnder)
-    {
-        var pos = GetPositionOnGround(room, roomUnder, 8);
-        room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.EntranceExit);
-    }
-
-    void PutExit(Room room)
-    {
-        var pos = GetPositionOnGround(room, null, 8);
-        room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.EntranceExit);
-    }
-
-    Coordinates GetPositionOnRoof(Room room, Room roomAbove)
-    {
-        List<Coordinates> availablePos = new();
-        for (int x = 0; x < 10; x++)
-        {
-            for (int y = 5; y < 8; y++)
-            {
-                if (y == 7)
-                {
-                    if (roomAbove is not null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && roomAbove.Grid[x, 0].GetComponent<TileScript>().Type == TileType.Dirt)
+                    if (room is not null)
                     {
-                        availablePos.Add(new Coordinates { x = x, y = y });
-                    }
-                    else if (roomAbove is null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty)
-                    {
-                        availablePos.Add(new Coordinates { x = x, y = y });
+                        foreach (var t in room.Grid)
+                        {
+                            Destroy(t);
+                        }
                     }
                 }
-                else if (room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && room.Grid[x, y + 1].GetComponent<TileScript>().Type == TileType.Dirt)
+                foreach (var room in optionalRooms)
                 {
-                    availablePos.Add(new Coordinates { x = x, y = y });
-                }
-            }
-        }
-
-        if(availablePos.Count == 0)
-        {
-            return null;
-        }
-
-        Coordinates roofPos = availablePos[Random.Range(0, availablePos.Count)];
-
-        return roofPos;
-    }
-
-    Coordinates GetPositionOnGround(Room room, Room roomUnder, int maxHeight)
-    {
-        List<Coordinates> availablePos = new();
-        for (int x = 0; x < 10; x++)
-        {
-            for (int y = 0; y < maxHeight; y++) // maxHeight 8 means position can be in any height
-            {
-                if (y == 0)
-                {
-                    if (roomUnder is not null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && roomUnder.Grid[x, 7].GetComponent<TileScript>().Type == TileType.Dirt)
+                    if (room is not null)
                     {
-                        availablePos.Add(new Coordinates { x = x, y = y });
-                    }
-                    else if (roomUnder is null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty)
-                    {
-                        availablePos.Add(new Coordinates { x = x, y = y });
+                        foreach (var t in room.Grid)
+                        {
+                            Destroy(t);
+                        }
                     }
                 }
-                else if (room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && room.Grid[x, y - 1].GetComponent<TileScript>().Type == TileType.Dirt)
+                Start();
+            }
+
+            void BreakingUpRandomGrid()
+            {
+                var randomY = Random.Range(0, 4);
+                var randomX = Random.Range(1, 3);
+                if (randomX == 1)
                 {
-                    availablePos.Add(new Coordinates { x = x, y = y });
+                    optionalRooms.Add(BuildARoom(-9.5f, 0.5f + randomY * 8, RoomType.Random, 40));
+                }
+                else if (randomX == 2)
+                {
+                    optionalRooms.Add(BuildARoom(40.5f, 0.5f + randomY * 8, RoomType.Random, 40));
                 }
             }
-        }
-
-        if (availablePos.Count == 0)
-        {
-            return null;
-        }
-
-        Coordinates groundPos = availablePos[Random.Range(0, availablePos.Count)];
-
-        return groundPos;
-    }
-
-    Room BuildARoom(float xS, float yS, RoomType type, int digCount)
-    {
-        Room roomToReturn = new();
-        roomToReturn.Type = type;
-        var grid = new GameObject[width, height];
-
-        float xPos = xS;
-        float yPos = yS;
-        for (int x = 0; x < width; x++)
-        {
-            yPos = yS;
-            for (int y = 0; y < height; y++)
+            void PutEntrance(Room room, Room roomUnder)
             {
-                var obj = Instantiate(air);
-                obj.GetComponent<TileScript>().Create(TileType.Dirt);
-                obj.transform.position = new Vector2(xPos, yPos);
-                grid[x, y] = obj;
-                yPos += yMove;
-            }
-            xPos += xMove;
-        }
-
-        roomToReturn.Grid = DigOutRoom(grid, digCount, false, Random.Range(3, 5), Random.Range(4, 6));
-
-        return roomToReturn;
-    }
-
-    GameObject[,] DigOutRoom(GameObject[,] grid, int digCount, bool DigUntilEmpty, int startX, int startY)
-    {
-        int diggerX = startX;
-        int diggerY = startY;
-        int remainingDigs = digCount;
-
-        if (DigUntilEmpty)
-        {
-            remainingDigs = 30;
-        }
-
-        List<GameObject> alreadyVisited = new();
-
-        grid[diggerX, diggerY].GetComponent<TileScript>().Visited = true;
-        alreadyVisited.Add(grid[diggerX, diggerY]);
-        remainingDigs--;
-
-
-        while (remainingDigs > 0)
-        {
-            Vector2 dir = GetRandomDirection();
-            while (diggerX + dir.x >= width || diggerY + dir.y >= height || diggerX + dir.x < 0 || diggerY + dir.y < 0)
-            {
-                dir = GetRandomDirection();
+                var pos = GetPositionOnGround(room, roomUnder, 8);
+                room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Entrance);
             }
 
-            //Debug.Log($"{dir.x} {dir.y}");
-            diggerX += (int)dir.x;
-            diggerY += (int)dir.y;
-
-            if (DigUntilEmpty)
+            void PutExit(Room room)
             {
-                if (grid[diggerX, diggerY].GetComponent<TileScript>().Type == TileType.Empty)
+                var pos = GetPositionOnGround(room, null, 8);
+                room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Exit);
+            }
+
+            Coordinates GetPositionOnRoof(Room room, Room roomAbove)
+            {
+                List<Coordinates> availablePos = new();
+                for (int x = 0; x < 10; x++)
                 {
-                    foreach (var v in alreadyVisited)
+                    for (int y = 5; y < 8; y++)
                     {
-                        v.GetComponent<TileScript>().Create(TileType.Empty);
+                        if (y == 7)
+                        {
+                            if (roomAbove is not null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && roomAbove.Grid[x, 0].GetComponent<TileScript>().Type == TileType.Dirt)
+                            {
+                                availablePos.Add(new Coordinates { x = x, y = y });
+                            }
+                            else if (roomAbove is null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty)
+                            {
+                                availablePos.Add(new Coordinates { x = x, y = y });
+                            }
+                        }
+                        else if (room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && room.Grid[x, y + 1].GetComponent<TileScript>().Type == TileType.Dirt)
+                        {
+                            availablePos.Add(new Coordinates { x = x, y = y });
+                        }
                     }
-
-                    return grid;
                 }
+
+                if (availablePos.Count == 0)
+                {
+                    return null;
+                }
+
+                Coordinates roofPos = availablePos[Random.Range(0, availablePos.Count)];
+
+                return roofPos;
             }
 
-            if (grid[diggerX, diggerY].GetComponent<TileScript>().Visited == false)
+            Coordinates GetPositionOnGround(Room room, Room roomUnder, int maxHeight)
             {
+                List<Coordinates> availablePos = new();
+                for (int x = 0; x < 10; x++)
+                {
+                    for (int y = 0; y < maxHeight; y++) // maxHeight 8 means position can be in any height
+                    {
+                        if (y == 0)
+                        {
+                            if (roomUnder is not null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && roomUnder.Grid[x, 7].GetComponent<TileScript>().Type == TileType.Dirt)
+                            {
+                                availablePos.Add(new Coordinates { x = x, y = y });
+                            }
+                            else if (roomUnder is null && room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty)
+                            {
+                                availablePos.Add(new Coordinates { x = x, y = y });
+                            }
+                        }
+                        else if (room.Grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && room.Grid[x, y - 1].GetComponent<TileScript>().Type == TileType.Dirt)
+                        {
+                            availablePos.Add(new Coordinates { x = x, y = y });
+                        }
+                    }
+                }
+
+                if (availablePos.Count == 0)
+                {
+                    return null;
+                }
+
+                Coordinates groundPos = availablePos[Random.Range(0, availablePos.Count)];
+
+                return groundPos;
+            }
+
+            Room BuildARoom(float xS, float yS, RoomType type, int digCount)
+            {
+                Room roomToReturn = new();
+                roomToReturn.Type = type;
+                var grid = new GameObject[width, height];
+
+                float xPos = xS;
+                float yPos = yS;
+                for (int x = 0; x < width; x++)
+                {
+                    yPos = yS;
+                    for (int y = 0; y < height; y++)
+                    {
+                        var obj = Instantiate(air);
+                        obj.GetComponent<TileScript>().Create(TileType.Dirt);
+                        obj.transform.position = new Vector2(xPos, yPos);
+                        grid[x, y] = obj;
+                        yPos += yMove;
+                    }
+                    xPos += xMove;
+                }
+
+                roomToReturn.Grid = DigOutRoom(grid, digCount, false, Random.Range(3, 5), Random.Range(4, 6));
+
+                return roomToReturn;
+            }
+
+            GameObject[,] DigOutRoom(GameObject[,] grid, int digCount, bool DigUntilEmpty, int startX, int startY)
+            {
+                int diggerX = startX;
+                int diggerY = startY;
+                int remainingDigs = digCount;
+
+                if (DigUntilEmpty)
+                {
+                    remainingDigs = 30;
+                }
+
+                List<GameObject> alreadyVisited = new();
+
                 grid[diggerX, diggerY].GetComponent<TileScript>().Visited = true;
                 alreadyVisited.Add(grid[diggerX, diggerY]);
                 remainingDigs--;
-            }
-        }
 
-        foreach (var v in alreadyVisited)
-        {
-            v.GetComponent<TileScript>().Create(TileType.Empty);
-        }
 
-        return grid;
-    }
-
-    Vector2 GetRandomDirection()
-    {
-        int direction = Random.Range(1, 5);
-
-        return direction switch
-        {
-            1 => new Vector2(1, 0),
-            2 => new Vector2(0, 1),
-            3 => new Vector2(-1, 0),
-            4 => new Vector2(0, -1),
-            _ => new Vector2(0, 0),
-        };
-    }
-
-    void BuildWalls()
-    {
-        //var obj = Instantiate(air);
-        float xPos = xStart - xMove;
-        float yPos = yStart - yMove;
-        //air.transform.position = new Vector2(xPos, yPos);
-        //air.GetComponent<SpriteRenderer>().color = Color.black;
-
-        for (int i = 0; i < height * 4 + 1; i++)
-        {
-            var til = Instantiate(air);
-            til.transform.position = new Vector2(xPos, yPos);
-            til.GetComponent<SpriteRenderer>().color = Color.black;
-            yPos += yMove;
-
-            if (i > 0)
-            {
-                leftWalls.Add(til);
-            }
-        }
-
-        for (int j = 0; j < width * 4 + 1; j++)
-        {
-            var til = Instantiate(air);
-            til.transform.position = new Vector2(xPos, yPos);
-            til.GetComponent<SpriteRenderer>().color = Color.black;
-            xPos += xMove;
-
-            if (j > 0)
-            {
-                topWalls.Add(til);
-            }
-        }
-
-        for (int k = 0; k < height * 4 + 1; k++)
-        {
-            var til = Instantiate(air);
-            til.transform.position = new Vector2(xPos, yPos);
-            til.GetComponent<SpriteRenderer>().color = Color.black;
-            yPos -= yMove;
-
-            if (k > 0)
-            {
-                rightWalls.Add(til);
-            }
-        }
-
-        for (int l = 0; l < width * 4 + 1; l++)
-        {
-            var til = Instantiate(air);
-            til.transform.position = new Vector2(xPos, yPos);
-            til.GetComponent<SpriteRenderer>().color = Color.black;
-            xPos -= xMove;
-
-            if (l > 0)
-            {
-                bottomWalls.Add(til);
-            }
-        }
-    }
-
-    void DigOutWalls()
-    {
-        int roomType = Random.Range(0, 4);
-
-        RoomType room = (RoomType)roomType;
-
-        switch (room)
-        {
-            case RoomType.Random:
-                break;
-            case RoomType.Corridor:
-                leftWalls[Random.Range(0, leftWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                rightWalls[Random.Range(0, rightWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                break;
-            case RoomType.DropFrom:
-                leftWalls[Random.Range(0, leftWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                rightWalls[Random.Range(0, rightWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                leftWalls[Random.Range(0, leftWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                rightWalls[Random.Range(0, rightWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                break;
-            case RoomType.DropTo:
-                leftWalls[Random.Range(0, leftWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                rightWalls[Random.Range(0, rightWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                topWalls[Random.Range(0, topWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
-                break;
-        }
-    }
-
-    private int[,] GenerateRoomPath()
-    {
-        //Pick a room from the top row and place the entrance
-        int[,] board = new int[4, 4];
-        int start = Random.Range(0, 4);
-        int x = start, prevX = start;
-        int y = 3, prevY = 3;
-        int exit = 0;
-        int levelWidth = 4;
-        int levelHeight = 4;
-
-        board[x, y] = 1;
-        //entrance = rooms[GetRoomID(x, y)];
-        RoomPath.Add(new Coordinates { x = x, y = y });
-
-        //Generate path until bottom floor
-        while (y >= 0)
-        {
-            //Select next random direction to move          
-            switch (RandomDirection())
-            {
-                case Direction.RIGHT:
-                    if (x < levelWidth - 1 && board[x + 1, y] == 0) x++; //Check if room is empty and move to the right if it is
-                    else if (x > 0 && board[x - 1, y] == 0) x--; //Move to the left 
-                    else goto case Direction.DOWN;
-                    board[x, y] = 1; //Corridor you run through
-                    break;
-                case Direction.LEFT:
-                    if (x > 0 && board[x - 1, y] == 0) x--; //Move to the left 
-                    else if (x < levelWidth - 1 && board[x + 1, y] == 0) x++; //Move to the right
-                    else goto case Direction.DOWN;
-                    board[x, y] = 1; //Corridor you run through
-                    break;
-                case Direction.DOWN:
-                    y--;
-                    //If not out of bounds
-                    if (y >= 0)
+                while (remainingDigs > 0)
+                {
+                    Vector2 dir = GetRandomDirection();
+                    while (diggerX + dir.x >= width || diggerY + dir.y >= height || diggerX + dir.x < 0 || diggerY + dir.y < 0)
                     {
-                        board[prevX, prevY] = 2; //Room you fall from
-                        board[x, y] = 3; //Room you drop into
+                        dir = GetRandomDirection();
                     }
-                    else exit = board[x, y + 1]; //Place exit room     
-                    break;
+
+                    //Debug.Log($"{dir.x} {dir.y}");
+                    diggerX += (int)dir.x;
+                    diggerY += (int)dir.y;
+
+                    if (DigUntilEmpty)
+                    {
+                        if (grid[diggerX, diggerY].GetComponent<TileScript>().Type == TileType.Empty)
+                        {
+                            foreach (var v in alreadyVisited)
+                            {
+                                v.GetComponent<TileScript>().Create(TileType.Empty);
+                            }
+
+                            return grid;
+                        }
+                    }
+
+                    if (grid[diggerX, diggerY].GetComponent<TileScript>().Visited == false)
+                    {
+                        grid[diggerX, diggerY].GetComponent<TileScript>().Visited = true;
+                        alreadyVisited.Add(grid[diggerX, diggerY]);
+                        remainingDigs--;
+                    }
+                }
+
+                foreach (var v in alreadyVisited)
+                {
+                    v.GetComponent<TileScript>().Create(TileType.Empty);
+                }
+
+                return grid;
             }
 
-            if (exit is 0)
+            Vector2 GetRandomDirection()
             {
+                int direction = Random.Range(1, 5);
+
+                return direction switch
+                {
+                    1 => new Vector2(1, 0),
+                    2 => new Vector2(0, 1),
+                    3 => new Vector2(-1, 0),
+                    4 => new Vector2(0, -1),
+                    _ => new Vector2(0, 0),
+                };
+            }
+
+            void BuildWalls()
+            {
+                //var obj = Instantiate(air);
+                float xPos = xStart - xMove;
+                float yPos = yStart - yMove;
+                //air.transform.position = new Vector2(xPos, yPos);
+                //air.GetComponent<SpriteRenderer>().color = Color.black;
+
+                for (int i = 0; i < height * 4 + 1; i++)
+                {
+                    var til = Instantiate(air);
+                    til.transform.position = new Vector2(xPos, yPos);
+                    til.GetComponent<SpriteRenderer>().color = Color.black;
+                    yPos += yMove;
+
+                    if (i > 0)
+                    {
+                        leftWalls.Add(til);
+                    }
+                }
+
+                for (int j = 0; j < width * 4 + 1; j++)
+                {
+                    var til = Instantiate(air);
+                    til.transform.position = new Vector2(xPos, yPos);
+                    til.GetComponent<SpriteRenderer>().color = Color.black;
+                    xPos += xMove;
+
+                    if (j > 0)
+                    {
+                        topWalls.Add(til);
+                    }
+                }
+
+                for (int k = 0; k < height * 4 + 1; k++)
+                {
+                    var til = Instantiate(air);
+                    til.transform.position = new Vector2(xPos, yPos);
+                    til.GetComponent<SpriteRenderer>().color = Color.black;
+                    yPos -= yMove;
+
+                    if (k > 0)
+                    {
+                        rightWalls.Add(til);
+                    }
+                }
+
+                for (int l = 0; l < width * 4 + 1; l++)
+                {
+                    var til = Instantiate(air);
+                    til.transform.position = new Vector2(xPos, yPos);
+                    til.GetComponent<SpriteRenderer>().color = Color.black;
+                    xPos -= xMove;
+
+                    if (l > 0)
+                    {
+                        bottomWalls.Add(til);
+                    }
+                }
+            }
+
+            void DigOutWalls()
+            {
+                int roomType = Random.Range(0, 4);
+
+                RoomType room = (RoomType)roomType;
+
+                switch (room)
+                {
+                    case RoomType.Random:
+                        break;
+                    case RoomType.Corridor:
+                        leftWalls[Random.Range(0, leftWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        rightWalls[Random.Range(0, rightWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        break;
+                    case RoomType.DropFrom:
+                        leftWalls[Random.Range(0, leftWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        rightWalls[Random.Range(0, rightWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        leftWalls[Random.Range(0, leftWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        rightWalls[Random.Range(0, rightWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        break;
+                    case RoomType.DropTo:
+                        leftWalls[Random.Range(0, leftWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        rightWalls[Random.Range(0, rightWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        topWalls[Random.Range(0, topWalls.Count)].GetComponent<SpriteRenderer>().color = Color.white;
+                        break;
+                }
+            }
+
+            private int[,] GenerateRoomPath()
+            {
+                //Pick a room from the top row and place the entrance
+                int[,] board = new int[4, 4];
+                int start = Random.Range(0, 4);
+                int x = start, prevX = start;
+                int y = 3, prevY = 3;
+                int exit = 0;
+                int levelWidth = 4;
+                int levelHeight = 4;
+
+                board[x, y] = 1;
+                //entrance = rooms[GetRoomID(x, y)];
                 RoomPath.Add(new Coordinates { x = x, y = y });
+
+                //Generate path until bottom floor
+                while (y >= 0)
+                {
+                    //Select next random direction to move          
+                    switch (RandomDirection())
+                    {
+                        case Direction.RIGHT:
+                            if (x < levelWidth - 1 && board[x + 1, y] == 0) x++; //Check if room is empty and move to the right if it is
+                            else if (x > 0 && board[x - 1, y] == 0) x--; //Move to the left 
+                            else goto case Direction.DOWN;
+                            board[x, y] = 1; //Corridor you run through
+                            break;
+                        case Direction.LEFT:
+                            if (x > 0 && board[x - 1, y] == 0) x--; //Move to the left 
+                            else if (x < levelWidth - 1 && board[x + 1, y] == 0) x++; //Move to the right
+                            else goto case Direction.DOWN;
+                            board[x, y] = 1; //Corridor you run through
+                            break;
+                        case Direction.DOWN:
+                            y--;
+                            //If not out of bounds
+                            if (y >= 0)
+                            {
+                                board[prevX, prevY] = 2; //Room you fall from
+                                board[x, y] = 3; //Room you drop into
+                            }
+                            else exit = board[x, y + 1]; //Place exit room     
+                            break;
+                    }
+
+                    if (exit is 0)
+                    {
+                        RoomPath.Add(new Coordinates { x = x, y = y });
+                    }
+                    else
+                    {
+                        RoomPath.Add(new Coordinates { x = x, y = y + 1 });
+                    }
+                    prevX = x;
+                    prevY = y;
+                }
+                return board;
             }
-            else
-            {
-                RoomPath.Add(new Coordinates { x = x, y = y + 1 });
-            }
-            prevX = x;
-            prevY = y;
-        }
-        return board;
-    }
 
     enum Direction
     {
@@ -941,6 +1029,121 @@ public class LevelGenerator : MonoBehaviour
         }
     }
 
+    private void PathFindUsingBreadthFirstSearch()
+    {
+        GameObject[,] allTiles = new GameObject[40, 32];
+
+        foreach (var room in rooms)
+        {
+            for (int x = 0; x < 10; x++)
+            {
+                for (int y = 0; y < 8; y++)
+                {
+                    allTiles[x + (room.X * 10), y + (room.Y * 8)] = room.Grid[x, y];
+                }
+            }
+        }
+
+        GameObject head = null;
+        GameObject tail = null;
+        foreach (var tile in allTiles)
+        {
+            if (tile.GetComponent<TileScript>().Type == TileType.Entrance)
+            {
+                head = tile;
+            }
+            else if (tile.GetComponent<TileScript>().Type == TileType.Exit)
+            {
+                tail = tile;
+            }
+        }
+
+        GameObject current;
+        List<GameObject> frontier = new();
+
+        frontier.Add(head);
+        Dictionary<GameObject, GameObject> cameFrom = new(); // path A->B is stored as cameFrom[B] == A
+        cameFrom[head] = null;
+
+        while (frontier.Count is not 0)
+        {
+            current = frontier.First();
+            frontier.Remove(current);
+            foreach (var next in GetAdjacentNodes(allTiles, current))
+            {
+                if (!cameFrom.ContainsKey(next))
+                {
+                    frontier.Add(next);
+                    cameFrom[next] = current;
+                }
+            }
+        }
+
+        current = tail;
+        while (current != head)
+        {
+            TilePath.Add(current);
+            current = cameFrom[current];
+        }
+        TilePath.Add(head);
+        TilePath.Reverse();
+        //PathDisplay.GetComponent<TextMeshProUGUI>().text = path.Count.ToString();
+    }
+
+    List<GameObject> GetAdjacentNodes(GameObject[,] allTiles, GameObject currentTile)
+    {
+        int curPosX = 0;
+        int curPosY = 0;
+        bool isFound = false;
+        for (int x = 0; x < 40; x++)
+        {
+            if (isFound is false)
+            {
+                for (int y = 0; y < 32; y++)
+                {
+                    if (allTiles[x, y] == currentTile)
+                    {
+                        curPosX = x;
+                        curPosY = y;
+                        isFound = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        List<GameObject> returnList = new();
+        List<GameObject> allAdjacentTiles = new();
+
+        if (curPosX != 0)
+        {
+            allAdjacentTiles.Add(allTiles[curPosX - 1, curPosY]);
+        }
+        if (curPosX != 39)
+        {
+            allAdjacentTiles.Add(allTiles[curPosX + 1, curPosY]);
+        }
+        if (curPosY != 0)
+        {
+            allAdjacentTiles.Add(allTiles[curPosX, curPosY - 1]);
+        }
+        if (curPosY != 31)
+        {
+            allAdjacentTiles.Add(allTiles[curPosX, curPosY + 1]);
+        }
+
+        foreach (var tile in allAdjacentTiles)
+        {
+            if (!tile.GetComponent<TileScript>().IsSolid())
+            {
+                returnList.Add(tile);
+            }
+        }
+
+        return returnList;
+    }
+
+
 #if UNITY_EDITOR
     [Header("Gizmos")]
     public GUIStyle style;
@@ -958,6 +1161,7 @@ public class LevelGenerator : MonoBehaviour
         if (!Application.isPlaying) return;
         DrawRooms();
         DrawPath();
+        DrawTilePath();
     }
 
     void DrawRooms()
@@ -997,6 +1201,24 @@ public class LevelGenerator : MonoBehaviour
                 Handles.color = Color.magenta;
                 Quaternion rot = Quaternion.LookRotation(i.Center() - previous.Center()).normalized;
                 Handles.ConeHandleCap(0, (i.Center() + previous.Center()) / 2 + (previous.Center() - i.Center()).normalized, rot, 1f, EventType.Repaint);
+            }
+            previous = i;
+        }
+    }
+
+    void DrawTilePath()
+    {
+        GameObject previous = null;
+        foreach (GameObject t in TilePath)
+        {
+            var i = t;
+            if (previous != null && previous != i)
+            {
+                Handles.color = Color.red;
+                Handles.DrawDottedLine(i.transform.position, previous.transform.position, 3);
+                //Handles.color = Color.black;
+                //Quaternion rot = Quaternion.LookRotation(i.transform.position - previous.transform.position).normalized;
+                //Handles.ConeHandleCap(0, (i.transform.position + previous.transform.position) / 2 + (previous.transform.position - i.transform.position).normalized, rot, 0.25f, EventType.Repaint);
             }
             previous = i;
         }

@@ -30,8 +30,11 @@ public class TileScript : MonoBehaviour
             case TileType.Dirt:
                 sprite.color = new Color(0.588f, 0.294f, 0);
                 break;
-            case TileType.EntranceExit:
-                sprite.color = Color.blue;
+            case TileType.Entrance:
+                sprite.color = new Color(0.5f, .75f, 0);
+                break;
+            case TileType.Exit:
+                sprite.color = new Color(0.25f, 0, .75f);
                 break;
             case TileType.Spike:
                 sprite.color = new Color(1f, 0.55f, 0);
@@ -68,4 +71,4 @@ public class TileScript : MonoBehaviour
 }
 
 public enum TileType 
-{Empty, Dirt, EntranceExit, Spike, Ladder, Bomb, Coin, Damsel, Snake, Bat }
+{Empty, Dirt, Entrance, Exit, Spike, Ladder, Bomb, Coin, Damsel, Snake, Bat }
