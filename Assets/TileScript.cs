@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using static LevelGenerator;
 
 public class TileScript : MonoBehaviour
 {
@@ -57,6 +58,9 @@ public class TileScript : MonoBehaviour
             case TileType.Bat:
                 sprite.color = new Color(0.1f, 0.1f, 0.4f);
                 break;
+            case TileType.Wall:
+                sprite.color = Color.black;
+                break;
         }
     }
 
@@ -69,6 +73,3 @@ public class TileScript : MonoBehaviour
         };
     }
 }
-
-public enum TileType 
-{Empty, Dirt, Entrance, Exit, Spike, Ladder, Bomb, Coin, Damsel, Snake, Bat }
