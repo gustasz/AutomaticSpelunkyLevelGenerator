@@ -62,14 +62,17 @@ public class LevelGenerator : MonoBehaviour
     List<Room> optionalRooms;
     GameObject[,] allTiles;
 
-    //evaluating scores
     public int RoomPathLength;
     public int TilePathLength;
     public int VerticalCorridors;
     public int NumberOfSpikes;
     public int NumberAndTypeOfEnemies;
 
-    public int DifficultyScore = 0;
+    public int UniqueTiles;
+
+    public int DifficultyScore;
+    public int FunScore;
+
     [SerializeField]
     private TMP_Text _diff;
 
@@ -96,6 +99,7 @@ public class LevelGenerator : MonoBehaviour
         NumberOfSpikes = 0;
         NumberAndTypeOfEnemies = 0;
         DifficultyScore = 0;
+        FunScore = 0;
     }
 
     void BuildAndDigOutRooms(int[,] board)
@@ -161,6 +165,7 @@ public class LevelGenerator : MonoBehaviour
         watch.Stop();
         var elapsedMs = watch.ElapsedMilliseconds;
         Debug.Log("Generation Time: " + elapsedMs + "ms");
+        CalculateFunScore();
     }
 
     private void CalculateDifficultyScore()
@@ -168,9 +173,9 @@ public class LevelGenerator : MonoBehaviour
         RoomPathLength = RoomPath.Count;
         TilePathLength = TilePath.Count;
         VerticalCorridors = 0;
-
         NumberOfSpikes = 0;
         NumberAndTypeOfEnemies = 0;
+
         for (int i = 0; i < allTiles.GetLength(0); i++)
         {
             for (int j = 0; j < allTiles.GetLength(1); j++)
@@ -190,7 +195,30 @@ public class LevelGenerator : MonoBehaviour
             }
         }
 
-        DifficultyScore = 20 * RoomPathLength + 5 * TilePathLength + 20 * NumberOfSpikes + 10 * NumberAndTypeOfEnemies;
+        for(int i = 0; i < RoomPath.Count - 2; i++)
+        {
+            if (RoomPath[i].y != RoomPath[i+1].y && RoomPath[i].y != RoomPath[i+2].y && RoomPath[i+1].y != RoomPath[i+2].y)
+            {
+                VerticalCorridors++;
+            }
+        }
+
+        DifficultyScore = 20 * RoomPathLength + 5 * TilePathLength + 20 * NumberOfSpikes + 10 * NumberAndTypeOfEnemies + 100 * VerticalCorridors;
+    }
+
+    private void CalculateFunScore()
+    {
+        List<TileType> tileTypes = new();
+
+        foreach(var tile in allTiles)
+        {
+            if(!tileTypes.Contains(tile.GetComponent<TileScript>().Type))
+            {
+                tileTypes.Add(tile.GetComponent<TileScript>().Type);
+            }
+        }
+
+        FunScore = 10 * tileTypes.Count;
     }
 
     void GenerateBats()
