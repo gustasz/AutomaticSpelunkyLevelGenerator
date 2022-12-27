@@ -39,10 +39,10 @@ public class LevelGenerator : MonoBehaviour
         }
     }
 
-    private int height = 8;
-    private int width = 10;
-    private int levelWidth = 5;
-    private int levelHeight = 5;
+    private int roomWidth = 10;
+    private int roomHeight = 8;
+    private int levelWidth = 4;
+    private int levelHeight = 4;
 
     public GameObject air;
     float xMove = 1;
@@ -74,12 +74,68 @@ public class LevelGenerator : MonoBehaviour
     public int FunScore;
 
     [SerializeField]
+    private TMP_Dropdown sizeDropdown;
+    [SerializeField]
+    private TMP_Dropdown difficultyDropdown;
+    [SerializeField]
     private TMP_Text _diff;
 
-    private void Reset()
+
+    private void GetNormalizedDifficultyValues()
+    {
+        int min = int.MaxValue;
+        int max = int.MinValue;
+        for (int i = 0; i < 100; i++)
+        {
+            RegenerateLevel();
+            if (DifficultyScore > max)
+            {
+                max = DifficultyScore;
+            }
+
+            if (DifficultyScore < min)
+            {
+                min = DifficultyScore;
+            }
+        }
+
+        Debug.Log($"min = {min}, max = {max}");
+        // min = 0%, max = 100%
+
+        float percent = (max - min) / 100f;
+
+        float ten = min + percent * 10f;
+        float fifty = min + percent * 50f;
+        float ninety = min + percent * 90f;
+
+        Debug.Log($"10% = {ten}, 50% = {fifty}, 90% = {ninety}");
+    }
+
+    private void ResetLevel()
     {
         RoomPath = new();
         TilePath = new();
+
+        switch (sizeDropdown.value)
+        {
+            case 0:
+                levelWidth = 3;
+                levelHeight = 3;
+                break;
+            case 1:
+                levelWidth = 3;
+                levelHeight = 3;
+                break;
+            case 2:
+                levelWidth = 4;
+                levelHeight = 4;
+                break;
+            case 3:
+                levelWidth = 5;
+                levelHeight = 5;
+                break;
+        }
+
         rooms = new Room[levelWidth, levelHeight];
         optionalRooms = new();
 
@@ -91,7 +147,7 @@ public class LevelGenerator : MonoBehaviour
             }
         }
 
-        allTiles = new GameObject[width * levelWidth, height * levelHeight];
+        allTiles = new GameObject[roomWidth * levelWidth, roomHeight * levelHeight];
 
         RoomPathLength = 0;
         TilePathLength = 0;
@@ -100,6 +156,11 @@ public class LevelGenerator : MonoBehaviour
         NumberAndTypeOfEnemies = 0;
         DifficultyScore = 0;
         FunScore = 0;
+    }
+
+    private void Start()
+    {
+        //GetNormalizedDifficultyValues();
     }
 
     void BuildAndDigOutRooms(int[,] board)
@@ -132,9 +193,9 @@ public class LevelGenerator : MonoBehaviour
         }
     }
 
-    void Start()
+    public void GenerateLevel()
     {
-        Reset();
+        ResetLevel();
 
         var watch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -149,6 +210,7 @@ public class LevelGenerator : MonoBehaviour
         PutEntrance(rooms[startRoom.x, startRoom.y], roomUnder);
         PutExit(rooms[endRoom.x, endRoom.y]);
 
+
         //BreakingUpRandomGrid();
         //BuildWalls();
         GenerateLadders();
@@ -158,6 +220,7 @@ public class LevelGenerator : MonoBehaviour
         GenerateSpikes();
         GenerateSnakes();
         PathFindUsingBreadthFirstSearch();
+        RemoveRandomDirtTiles();
 
         CalculateDifficultyScore();
         _diff.text = DifficultyScore.ToString();
@@ -166,6 +229,17 @@ public class LevelGenerator : MonoBehaviour
         var elapsedMs = watch.ElapsedMilliseconds;
         Debug.Log("Generation Time: " + elapsedMs + "ms");
         CalculateFunScore();
+    }
+
+    private void RemoveRandomDirtTiles()
+    {
+        foreach(var tile in allTiles)
+        {
+            if(tile.GetComponent<TileScript>().Type == TileType.Dirt && Random.Range(1,21) == 1)
+            {
+                tile.GetComponent<TileScript>().Create(TileType.Empty);
+            }
+        }
     }
 
     private void CalculateDifficultyScore()
@@ -195,9 +269,9 @@ public class LevelGenerator : MonoBehaviour
             }
         }
 
-        for(int i = 0; i < RoomPath.Count - 2; i++)
+        for (int i = 0; i < RoomPath.Count - 2; i++)
         {
-            if (RoomPath[i].y != RoomPath[i+1].y && RoomPath[i].y != RoomPath[i+2].y && RoomPath[i+1].y != RoomPath[i+2].y)
+            if (RoomPath[i].y != RoomPath[i + 1].y && RoomPath[i].y != RoomPath[i + 2].y && RoomPath[i + 1].y != RoomPath[i + 2].y)
             {
                 VerticalCorridors++;
             }
@@ -210,9 +284,9 @@ public class LevelGenerator : MonoBehaviour
     {
         List<TileType> tileTypes = new();
 
-        foreach(var tile in allTiles)
+        foreach (var tile in allTiles)
         {
-            if(!tileTypes.Contains(tile.GetComponent<TileScript>().Type))
+            if (!tileTypes.Contains(tile.GetComponent<TileScript>().Type))
             {
                 tileTypes.Add(tile.GetComponent<TileScript>().Type);
             }
@@ -312,7 +386,12 @@ public class LevelGenerator : MonoBehaviour
                 return;
             }
 
-            r.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Spike);
+            if (pos.y != roomHeight - 1 && r.Grid[pos.x, pos.y + 1].GetComponent<TileScript>().Type == TileType.Empty &&
+                pos.x != 0 && r.Grid[pos.x - 1, pos.y + 1].GetComponent<TileScript>().Type == TileType.Empty &&
+                pos.x != roomWidth - 1 && r.Grid[pos.x + 1, pos.y + 1].GetComponent<TileScript>().Type == TileType.Empty)
+            {
+                r.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Spike);
+            }
         }
     }
 
@@ -490,8 +569,8 @@ public class LevelGenerator : MonoBehaviour
 
             var grid = r.Grid;
 
-            for (int x = 0; x < width; x++)
-                for (int y = 3; y < height; y++)
+            for (int x = 0; x < roomWidth; x++)
+                for (int y = 3; y < roomHeight; y++)
                 {
                     if (grid[x, y].GetComponent<TileScript>().Type == TileType.Empty && grid[x, y - 1].GetComponent<TileScript>().Type == TileType.Dirt)
                     {
@@ -500,7 +579,7 @@ public class LevelGenerator : MonoBehaviour
                             && grid[x - 1, y - 2].GetComponent<TileScript>().Type == TileType.Empty
                             && grid[x - 1, y - 3].GetComponent<TileScript>().Type == TileType.Empty
                             && ((y != 3 && grid[x - 1, y - 4].GetComponent<TileScript>().Type == TileType.Dirt)
-                            || (roomUnder is not null && y == 3 && roomUnder.Grid[x - 1, height - 1].GetComponent<TileScript>().Type == TileType.Dirt)))
+                            || (roomUnder is not null && y == 3 && roomUnder.Grid[x - 1, roomHeight - 1].GetComponent<TileScript>().Type == TileType.Dirt)))
                         {
                             grid[x - 1, y - 1].GetComponent<TileScript>().Create(TileType.Ladder);
                             grid[x - 1, y - 2].GetComponent<TileScript>().Create(TileType.Ladder);
@@ -511,7 +590,7 @@ public class LevelGenerator : MonoBehaviour
                             && grid[x + 1, y - 2].GetComponent<TileScript>().Type == TileType.Empty
                             && grid[x + 1, y - 3].GetComponent<TileScript>().Type == TileType.Empty
                             && ((y != 3 && grid[x + 1, y - 4].GetComponent<TileScript>().Type == TileType.Dirt)
-                            || (roomUnder is not null && y == 3 && roomUnder.Grid[x + 1, height-1].GetComponent<TileScript>().Type == TileType.Dirt)))
+                            || (roomUnder is not null && y == 3 && roomUnder.Grid[x + 1, roomHeight - 1].GetComponent<TileScript>().Type == TileType.Dirt)))
                         {
                             grid[x + 1, y - 1].GetComponent<TileScript>().Create(TileType.Ladder);
                             grid[x + 1, y - 2].GetComponent<TileScript>().Create(TileType.Ladder);
@@ -542,27 +621,30 @@ public class LevelGenerator : MonoBehaviour
 
     public void RegenerateLevel()
     {
-        foreach (var room in rooms)
+        if (rooms is not null)
         {
-            if (room is not null)
+            foreach (var room in rooms)
             {
-                foreach (var t in room.Grid)
+                if (room is not null)
                 {
-                    Destroy(t);
+                    foreach (var t in room.Grid)
+                    {
+                        Destroy(t);
+                    }
+                }
+            }
+            foreach (var room in optionalRooms)
+            {
+                if (room is not null)
+                {
+                    foreach (var t in room.Grid)
+                    {
+                        Destroy(t);
+                    }
                 }
             }
         }
-        foreach (var room in optionalRooms)
-        {
-            if (room is not null)
-            {
-                foreach (var t in room.Grid)
-                {
-                    Destroy(t);
-                }
-            }
-        }
-        Start();
+        GenerateLevel();
     }
 
     void PutEntrance(Room room, Room roomUnder)
@@ -651,14 +733,14 @@ public class LevelGenerator : MonoBehaviour
     {
         Room roomToReturn = new();
         roomToReturn.Type = type;
-        var grid = new GameObject[width, height];
+        var grid = new GameObject[roomWidth, roomHeight];
 
         float xPos = xS;
         float yPos = yS;
-        for (int x = 0; x < width; x++)
+        for (int x = 0; x < roomWidth; x++)
         {
             yPos = yS;
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < roomHeight; y++)
             {
                 var obj = Instantiate(air);
                 obj.GetComponent<TileScript>().Create(TileType.Dirt);
@@ -695,7 +777,7 @@ public class LevelGenerator : MonoBehaviour
         while (remainingDigs > 0)
         {
             Vector2 dir = GetRandomDirection();
-            while (diggerX + dir.x >= width || diggerY + dir.y >= height || diggerX + dir.x < 0 || diggerY + dir.y < 0)
+            while (diggerX + dir.x >= roomWidth || diggerY + dir.y >= roomHeight || diggerX + dir.x < 0 || diggerY + dir.y < 0)
             {
                 dir = GetRandomDirection();
             }
@@ -755,7 +837,7 @@ public class LevelGenerator : MonoBehaviour
         //air.transform.position = new Vector2(xPos, yPos);
         //air.GetComponent<SpriteRenderer>().color = Color.black;
 
-        for (int i = 0; i < height * 4 + 1; i++)
+        for (int i = 0; i < roomHeight * 4 + 1; i++)
         {
             var til = Instantiate(air);
             til.transform.position = new Vector2(xPos, yPos);
@@ -768,7 +850,7 @@ public class LevelGenerator : MonoBehaviour
             }
         }
 
-        for (int j = 0; j < width * 4 + 1; j++)
+        for (int j = 0; j < roomWidth * 4 + 1; j++)
         {
             var til = Instantiate(air);
             til.transform.position = new Vector2(xPos, yPos);
@@ -781,7 +863,7 @@ public class LevelGenerator : MonoBehaviour
             }
         }
 
-        for (int k = 0; k < height * 4 + 1; k++)
+        for (int k = 0; k < roomHeight * 4 + 1; k++)
         {
             var til = Instantiate(air);
             til.transform.position = new Vector2(xPos, yPos);
@@ -794,7 +876,7 @@ public class LevelGenerator : MonoBehaviour
             }
         }
 
-        for (int l = 0; l < width * 4 + 1; l++)
+        for (int l = 0; l < roomWidth * 4 + 1; l++)
         {
             var til = Instantiate(air);
             til.transform.position = new Vector2(xPos, yPos);
@@ -943,7 +1025,7 @@ public class LevelGenerator : MonoBehaviour
         {
             var rightTiles = rooms[x + 1, y].Grid;
 
-            for (int i = 0; i < height; i++)
+            for (int i = 0; i < roomHeight; i++)
             {
                 if ((currentTiles[9, i].GetComponent<TileScript>().Type == TileType.Empty) && (rightTiles[0, i].GetComponent<TileScript>().Type == TileType.Empty))
                 {
@@ -956,11 +1038,11 @@ public class LevelGenerator : MonoBehaviour
                 int rightMostRow = 0;
                 bool found = false;
                 List<int> rightMostIndexes = new();
-                for (int i = width - 1; i > 0; i--)
+                for (int i = roomWidth - 1; i > 0; i--)
                 {
                     if (!found)
                     {
-                        for (int j = 0; j < height; j++)
+                        for (int j = 0; j < roomHeight; j++)
                         {
                             if (currentTiles[i, j].GetComponent<TileScript>().Type == TileType.Empty)
                             {
@@ -975,7 +1057,7 @@ public class LevelGenerator : MonoBehaviour
                 int k = rightMostIndexes[Random.Range(0, rightMostIndexes.Count)];
                 if (currentTiles[rightMostRow, k].GetComponent<TileScript>().Type == TileType.Empty)
                 {
-                    while (rightMostRow < width)
+                    while (rightMostRow < roomWidth)
                     {
                         currentTiles[rightMostRow, k].GetComponent<TileScript>().Create(TileType.Empty);
                         rightMostRow++;
@@ -990,7 +1072,7 @@ public class LevelGenerator : MonoBehaviour
         {
             var leftTiles = rooms[x - 1, y].Grid;
 
-            for (int i = 0; i < height; i++)
+            for (int i = 0; i < roomHeight; i++)
             {
                 if ((currentTiles[0, i].GetComponent<TileScript>().Type == TileType.Empty) && (leftTiles[9, i].GetComponent<TileScript>().Type == TileType.Empty))
                 {
@@ -1003,11 +1085,11 @@ public class LevelGenerator : MonoBehaviour
                 int leftMostRow = 9;
                 bool found = false;
                 List<int> leftMostIndexes = new();
-                for (int i = 0; i < width; i++)
+                for (int i = 0; i < roomWidth; i++)
                 {
                     if (!found)
                     {
-                        for (int j = 0; j < height; j++)
+                        for (int j = 0; j < roomHeight; j++)
                         {
                             if (currentTiles[j, i].GetComponent<TileScript>().Type == TileType.Empty)
                             {
@@ -1037,7 +1119,7 @@ public class LevelGenerator : MonoBehaviour
         {
             var topTiles = rooms[x, y + 1].Grid;
 
-            for (int i = 0; i < width; i++)
+            for (int i = 0; i < roomWidth; i++)
             {
                 if ((currentTiles[i, 7].GetComponent<TileScript>().Type == TileType.Empty) && (topTiles[i, 0].GetComponent<TileScript>().Type == TileType.Empty))
                 {
@@ -1050,11 +1132,11 @@ public class LevelGenerator : MonoBehaviour
                 int topMostCol = 0;
                 bool found = false;
                 List<int> topMostIndexes = new();
-                for (int i = height - 1; i > 0; i--)
+                for (int i = roomHeight - 1; i > 0; i--)
                 {
                     if (!found)
                     {
-                        for (int j = 0; j < width; j++)
+                        for (int j = 0; j < roomWidth; j++)
                         {
                             if (currentTiles[j, i].GetComponent<TileScript>().Type == TileType.Empty)
                             {
@@ -1069,7 +1151,7 @@ public class LevelGenerator : MonoBehaviour
                 int k = topMostIndexes[Random.Range(0, topMostIndexes.Count)];
                 if (currentTiles[k, topMostCol].GetComponent<TileScript>().Type == TileType.Empty)
                 {
-                    while (topMostCol < height)
+                    while (topMostCol < roomHeight)
                     {
                         currentTiles[k, topMostCol].GetComponent<TileScript>().Create(TileType.Empty);
                         topMostCol++;
@@ -1084,7 +1166,7 @@ public class LevelGenerator : MonoBehaviour
         {
             var bottomTiles = rooms[x, y - 1].Grid;
 
-            for (int i = 0; i < width; i++)
+            for (int i = 0; i < roomWidth; i++)
             {
                 if ((currentTiles[i, 0].GetComponent<TileScript>().Type == TileType.Empty) && (bottomTiles[i, 7].GetComponent<TileScript>().Type == TileType.Empty))
                 {
@@ -1097,11 +1179,11 @@ public class LevelGenerator : MonoBehaviour
                 int bottomMostCol = 7;
                 bool found = false;
                 List<int> bottomMostIndexes = new();
-                for (int i = 0; i < height; i++)
+                for (int i = 0; i < roomHeight; i++)
                 {
                     if (!found)
                     {
-                        for (int j = 0; j < width; j++)
+                        for (int j = 0; j < roomWidth; j++)
                         {
                             if (currentTiles[j, i].GetComponent<TileScript>().Type == TileType.Empty)
                             {
@@ -1126,15 +1208,6 @@ public class LevelGenerator : MonoBehaviour
                 DigOutRoom(bottomTiles, 0, true, k, 7);
             }
         }
-
-        foreach(var tile in currentTiles)
-        {
-            if(tile.GetComponent<TileScript>().Type == TileType.Dirt && Random.Range(1,21) == 1)
-            {
-                tile.GetComponent<TileScript>().Create(TileType.Empty);
-            }
-        }
-
     }
 
     private void PathFindUsingBreadthFirstSearch()
@@ -1183,30 +1256,16 @@ public class LevelGenerator : MonoBehaviour
                 if (!cameFrom.ContainsKey(next))
                 {
                     frontier.Add(next);
-                    try
-                    {
-                        cameFrom[next] = current;
-                    }
-                    catch
-                    {
-                        Debug.Log("yo");
-                    }
+                    cameFrom[next] = current;
                 }
             }
         }
 
         current = tail;
-        while (current != head)
+        while (current != head) // WAS CAUSING ALL THE FREEZE ISSUES
         {
             TilePath.Add(current);
-            try
-            {
-                current = cameFrom[current];
-            }
-            catch
-            {
-                Debug.Log("asd");
-            }
+            current = cameFrom[current];
         }
         TilePath.Add(head);
         TilePath.Reverse();
@@ -1218,11 +1277,11 @@ public class LevelGenerator : MonoBehaviour
         int curPosX = 0;
         int curPosY = 0;
         bool isFound = false;
-        for (int x = 0; x < width * levelWidth; x++)
+        for (int x = 0; x < roomWidth * levelWidth; x++)
         {
             if (isFound is false)
             {
-                for (int y = 0; y < height * levelHeight; y++)
+                for (int y = 0; y < roomHeight * levelHeight; y++)
                 {
                     if (allTiles[x, y] == currentTile)
                     {
@@ -1242,7 +1301,7 @@ public class LevelGenerator : MonoBehaviour
         {
             allAdjacentTiles.Add(allTiles[curPosX - 1, curPosY]);
         }
-        if (curPosX != width * levelWidth - 1)
+        if (curPosX != roomWidth * levelWidth - 1)
         {
             allAdjacentTiles.Add(allTiles[curPosX + 1, curPosY]);
         }
@@ -1250,7 +1309,7 @@ public class LevelGenerator : MonoBehaviour
         {
             allAdjacentTiles.Add(allTiles[curPosX, curPosY - 1]);
         }
-        if (curPosY != height * levelHeight - 1)
+        if (curPosY != roomHeight * levelHeight - 1)
         {
             allAdjacentTiles.Add(allTiles[curPosX, curPosY + 1]);
         }
@@ -1281,7 +1340,7 @@ public class LevelGenerator : MonoBehaviour
     //Draw gizmos
     private void OnDrawGizmos()
     {
-        if (!Application.isPlaying) return;
+        if (!Application.isPlaying || rooms is null) return;
         DrawRooms();
         DrawPath();
         DrawTilePath();
@@ -1294,7 +1353,7 @@ public class LevelGenerator : MonoBehaviour
             for (int y = 0; y < levelHeight; y++)
             {
                 Gizmos.color = new Color32(255, 253, 0, 128);
-                Gizmos.DrawWireCube(new Vector2(x * 10 + 5, y * 8 + 4), new Vector2(width, height));
+                Gizmos.DrawWireCube(new Vector2(x * 10 + 5, y * 8 + 4), new Vector2(roomWidth, roomHeight));
 
             }
         }
