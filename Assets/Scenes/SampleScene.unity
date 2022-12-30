@@ -2390,7 +2390,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 2038949705}
         m_TargetAssemblyTypeName: LevelGenerator, Assembly-CSharp
-        m_MethodName: RegenerateLevel
+        m_MethodName: GenerateLevel
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -3113,6 +3113,9 @@ MonoBehaviour:
   UniqueTiles: 0
   DifficultyScore: 0
   FunScore: 0
+  CalibrationMode: 0
+  DiffScoreToGenerate: 0
+  PercentValue: 0
   sizeDropdown: {fileID: 1583477702}
   difficultyDropdown: {fileID: 1433294507}
   _diff: {fileID: 1515721880}

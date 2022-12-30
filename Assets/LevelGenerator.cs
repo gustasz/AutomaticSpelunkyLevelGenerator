@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -41,8 +42,8 @@ public class LevelGenerator : MonoBehaviour
 
     private int roomWidth = 10;
     private int roomHeight = 8;
-    private int levelWidth = 4;
-    private int levelHeight = 4;
+    private int levelWidth = 5;
+    private int levelHeight = 5;
 
     public GameObject air;
     float xMove = 1;
@@ -73,6 +74,18 @@ public class LevelGenerator : MonoBehaviour
     public int DifficultyScore;
     public int FunScore;
 
+    public bool CalibrationMode = false;
+
+    // 10%, 50%, 90%, 1% value
+    public float[,] DiffScores = new float[3, 4] {
+   {289.5f, 467.5f, 645.5f, 4.45f} , // 3x3
+   {532.5f, 842.5f, 1152.5f, 7.75f} , // 4x4
+   {712f, 1040f, 1368f, 8.2f}  // 5x5
+};
+
+    public float DiffScoreToGenerate = 0;
+    public float PercentValue = 0;
+
     [SerializeField]
     private TMP_Dropdown sizeDropdown;
     [SerializeField]
@@ -87,7 +100,7 @@ public class LevelGenerator : MonoBehaviour
         int max = int.MinValue;
         for (int i = 0; i < 100; i++)
         {
-            RegenerateLevel();
+            RegenerateLevel(levelWidth, levelHeight);
             if (DifficultyScore > max)
             {
                 max = DifficultyScore;
@@ -108,33 +121,13 @@ public class LevelGenerator : MonoBehaviour
         float fifty = min + percent * 50f;
         float ninety = min + percent * 90f;
 
-        Debug.Log($"10% = {ten}, 50% = {fifty}, 90% = {ninety}");
+        Debug.Log($"10% = {ten}, 50% = {fifty}, 90% = {ninety}, 1% size = {percent}");
     }
 
     private void ResetLevel()
     {
         RoomPath = new();
         TilePath = new();
-
-        switch (sizeDropdown.value)
-        {
-            case 0:
-                levelWidth = 3;
-                levelHeight = 3;
-                break;
-            case 1:
-                levelWidth = 3;
-                levelHeight = 3;
-                break;
-            case 2:
-                levelWidth = 4;
-                levelHeight = 4;
-                break;
-            case 3:
-                levelWidth = 5;
-                levelHeight = 5;
-                break;
-        }
 
         rooms = new Room[levelWidth, levelHeight];
         optionalRooms = new();
@@ -195,47 +188,103 @@ public class LevelGenerator : MonoBehaviour
 
     public void GenerateLevel()
     {
-        ResetLevel();
+        if (CalibrationMode is false)
+        {
+            switch (sizeDropdown.value)
+            {
+                case 0:
+                    return;
+                case 1:
+                    levelWidth = 3;
+                    levelHeight = 3;
+                    break;
+                case 2:
+                    levelWidth = 4;
+                    levelHeight = 4;
+                    break;
+                case 3:
+                    levelWidth = 5;
+                    levelHeight = 5;
+                    break;
+            }
 
+            switch (difficultyDropdown.value)
+            {
+                case 0:
+                    return;
+                case 1:
+                    DiffScoreToGenerate = DiffScores[sizeDropdown.value - 1, 0];
+                    break;
+                case 2:
+                    DiffScoreToGenerate = DiffScores[sizeDropdown.value - 1, 1];
+                    break;
+                case 3:
+                    DiffScoreToGenerate = DiffScores[sizeDropdown.value - 1, 2];
+                    break;
+            }
+        PercentValue = DiffScores[sizeDropdown.value - 1, 3];
+        }
+
+
+        Debug.Log($"Generating a level with {DiffScoreToGenerate} diff score.");
         var watch = System.Diagnostics.Stopwatch.StartNew();
 
-        var board = GenerateRoomPath();
+        bool GeneratedLevelWithinDifficulty = false;
 
-        BuildAndDigOutRooms(board);
+        for (int i = 0; i < 100; i++)
+        {
+            ResetLevel();
 
-        Coordinates startRoom = RoomPath.First();
-        Coordinates endRoom = RoomPath.Last();
-        Room roomUnder = startRoom.y > 0 ? rooms[startRoom.x, startRoom.y - 1] : null;
+            var board = GenerateRoomPath();
 
-        PutEntrance(rooms[startRoom.x, startRoom.y], roomUnder);
-        PutExit(rooms[endRoom.x, endRoom.y]);
+            BuildAndDigOutRooms(board);
+
+            Coordinates startRoom = RoomPath.First();
+            Coordinates endRoom = RoomPath.Last();
+            Room roomUnder = startRoom.y > 0 ? rooms[startRoom.x, startRoom.y - 1] : null;
+
+            PutEntrance(rooms[startRoom.x, startRoom.y], roomUnder);
+            PutExit(rooms[endRoom.x, endRoom.y]);
 
 
-        //BreakingUpRandomGrid();
-        //BuildWalls();
-        GenerateLadders();
-        GenerateItems();
-        GenerateDamsel();
-        GenerateBats();
-        GenerateSpikes();
-        GenerateSnakes();
-        PathFindUsingBreadthFirstSearch();
-        RemoveRandomDirtTiles();
+            //BreakingUpRandomGrid();
+            //BuildWalls();
+            GenerateLadders();
+            GenerateItems();
+            GenerateDamsel();
+            GenerateBats();
+            GenerateSpikes();
+            GenerateSnakes();
+            PathFindUsingBreadthFirstSearch();
+            RemoveRandomDirtTiles();
 
-        CalculateDifficultyScore();
-        _diff.text = DifficultyScore.ToString();
+            CalculateDifficultyScore();
+            _diff.text = DifficultyScore.ToString();
 
-        watch.Stop();
-        var elapsedMs = watch.ElapsedMilliseconds;
-        Debug.Log("Generation Time: " + elapsedMs + "ms");
-        CalculateFunScore();
+            CalculateFunScore();
+
+            Debug.Log($"{Math.Abs(DiffScoreToGenerate - DifficultyScore)} < {PercentValue} * 5");
+            if (DiffScoreToGenerate == 0 || Math.Abs(DiffScoreToGenerate - DifficultyScore) < PercentValue * 5 )
+            {
+                GeneratedLevelWithinDifficulty = true;
+                break;
+            }
+        }
+
+            watch.Stop();
+            Debug.Log("Generation Time: " + watch.ElapsedMilliseconds + "ms");
+
+        if(GeneratedLevelWithinDifficulty is false)
+        {
+            Debug.Log($"ERROR, couldn't generate a level in 100 tries");
+        }
     }
 
     private void RemoveRandomDirtTiles()
     {
-        foreach(var tile in allTiles)
+        foreach (var tile in allTiles)
         {
-            if(tile.GetComponent<TileScript>().Type == TileType.Dirt && Random.Range(1,21) == 1)
+            if (tile.GetComponent<TileScript>().Type == TileType.Dirt && Random.Range(1, 21) == 1)
             {
                 tile.GetComponent<TileScript>().Create(TileType.Empty);
             }
@@ -299,7 +348,7 @@ public class LevelGenerator : MonoBehaviour
     {
         foreach (var r in rooms)
         {
-            if (Random.Range(1, 9) != 1) // 12.5% per room to have a bat
+            if (Random.Range(1, 7) != 1)
             {
                 continue;
             }
@@ -366,7 +415,7 @@ public class LevelGenerator : MonoBehaviour
     {
         foreach (var r in rooms)
         {
-            if (Random.Range(1, 5) != 1)
+            if (Random.Range(1, 4) != 1)
             {
                 continue;
             }
@@ -399,7 +448,7 @@ public class LevelGenerator : MonoBehaviour
     {
         foreach (var r in rooms)
         {
-            if (Random.Range(1, 5) != 1)
+            if (Random.Range(1, 4) != 1)
             {
                 continue;
             }
@@ -619,7 +668,7 @@ public class LevelGenerator : MonoBehaviour
         rooms[chosenRoom.x, chosenRoom.y].Grid[damselPos.x, damselPos.y].GetComponent<TileScript>().Create(TileType.Damsel);
     }
 
-    public void RegenerateLevel()
+    public void RegenerateLevel(int width, int height)
     {
         if (rooms is not null)
         {
