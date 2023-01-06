@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using Random = UnityEngine.Random;
 using Gizmos = Popcron.Gizmos;
+using System.Text;
 
 public class LevelGenerator : MonoBehaviour
 {
@@ -42,8 +43,8 @@ public class LevelGenerator : MonoBehaviour
 
     private readonly int roomWidth = 10;
     private readonly int roomHeight = 8;
-    private int levelWidth = 5;
-    private int levelHeight = 5;
+    private int levelWidth = 4;
+    private int levelHeight = 4;
 
     public GameObject air;
     private readonly float xMove = 1;
@@ -72,14 +73,17 @@ public class LevelGenerator : MonoBehaviour
     public int DifficultyScore;
     public int FunScore;
 
-    public bool CalibrationMode = false;
+    private readonly bool CalibrationMode = true;
     private bool ShowOverlay = false;
 
     // 10%, 50%, 90%, 1% value
-    public float[,] DiffScores = new float[3, 4] {
+    public float[,] DiffScores = new float[6, 4] {
    {289.5f, 467.5f, 645.5f, 4.45f} , // 3x3
    {532.5f, 842.5f, 1152.5f, 7.75f} , // 4x4
-   {712f, 1040f, 1368f, 8.2f}  // 5x5
+   {712f, 1040f, 1368f, 8.2f},  // 5x5
+   {887f, 1315f, 1743f, 10.7f }, // 6x6
+   {534.5f, 852.5f, 1170.5f, 7.95f }, // 5x4
+   {701.5f, 1067.5f, 1433.5f, 9.15f } // 4x5
 };
 
     public float DiffScoreToGenerate = 0;
@@ -96,32 +100,61 @@ public class LevelGenerator : MonoBehaviour
 
     private void GetNormalizedDifficultyValues()
     {
-        int min = int.MaxValue;
-        int max = int.MinValue;
-        for (int i = 0; i < 100; i++)
+        List<int> DiffScores = new();
+        for (int i = 0; i < 1000; i++)
         {
-            RegenerateLevel(levelWidth, levelHeight);
-            if (DifficultyScore > max)
-            {
-                max = DifficultyScore;
-            }
+            RegenerateLevel();
+            DiffScores.Add(DifficultyScore);
+        }
 
-            if (DifficultyScore < min)
+        var counts = GetNormalizedCounts(DiffScores);
+        Debug.Log(GetSumArrayString(counts));
+    }
+
+    public int[] GetNormalizedCounts(List<int> input)
+    {
+        if (input == null || input.Count == 0)
+        {
+            throw new ArgumentException("The input list must not be null or empty.");
+        }
+
+        // Normalize the values
+        var min = input.Min();
+        var max = input.Max();
+        var range = max - min;
+        var normalizedInput = input.Select(i => (i - min) / (double)range).ToList();
+
+        // Count how many values fall into each percentage range
+        var counts = new int[100];
+        foreach (var value in normalizedInput)
+        {
+            var percentage = value * 100;
+            var index = (int)Math.Floor(percentage);
+            if (index != 100)
             {
-                min = DifficultyScore;
+                counts[index]++;
             }
         }
 
-        Debug.Log($"min = {min}, max = {max}");
-        // min = 0%, max = 100%
+        Debug.Log($"10% = {range / 10 + min}, 50% {range / 2 + min}, 90% {range / 10 * 9 + min}, percent = {range / 100}");
+        return counts;
+    }
 
-        float percent = (max - min) / 100f;
 
-        float ten = min + percent * 10f;
-        float fifty = min + percent * 50f;
-        float ninety = min + percent * 90f;
+    public string GetSumArrayString(int[] input)
+    {
+        if (input == null || input.Length != 100)
+        {
+            throw new ArgumentException("The input array must have a size of 100.");
+        }
 
-        Debug.Log($"10% = {ten}, 50% = {fifty}, 90% = {ninety}, 1% size = {percent}");
+        var sb = new StringBuilder();
+        for (int i = 0; i < 50; i++)
+        {
+            sb.AppendFormat("({0},{1})", i * 2, input[i * 2] + input[i * 2 + 1]);
+        }
+
+        return sb.ToString();
     }
 
     private void ResetLevel()
@@ -153,17 +186,20 @@ public class LevelGenerator : MonoBehaviour
 
     private void Start()
     {
-        //GetNormalizedDifficultyValues();
+        if (CalibrationMode)
+        {
+            GetNormalizedDifficultyValues();
+        }
     }
 
     void BuildAndDigOutRooms(int[,] board)
     {
         float xP;
         float yP = yStart;
-        for (int y = 0; y < levelWidth; y++)
+        for (int y = 0; y < levelHeight; y++)
         {
             xP = xStart;
-            for (int x = 0; x < levelHeight; x++)
+            for (int x = 0; x < levelWidth; x++)
             {
                 var r = BuildARoom(xP, yP, (RoomType)board[x, y], 30);
                 r.X = x;
@@ -174,9 +210,9 @@ public class LevelGenerator : MonoBehaviour
             yP += 8;
         }
 
-        for (int y = levelWidth - 1; y >= 0; y--)
+        for (int y = levelHeight - 1; y >= 0; y--)
         {
-            for (int x = 0; x < levelHeight; x++)
+            for (int x = 0; x < levelWidth; x++)
             {
                 if (rooms[x, y].Type is not RoomType.Random)
                 {
@@ -206,6 +242,18 @@ public class LevelGenerator : MonoBehaviour
                     break;
                 case 3:
                     levelWidth = 5;
+                    levelHeight = 5;
+                    break;
+                case 4:
+                    levelWidth = 6;
+                    levelHeight = 6;
+                    break;
+                case 5:
+                    levelWidth = 5;
+                    levelHeight = 4;
+                    break;
+                case 6:
+                    levelWidth = 4;
                     levelHeight = 5;
                     break;
             }
@@ -246,11 +294,25 @@ public class LevelGenerator : MonoBehaviour
             Coordinates endRoom = RoomPath.Last();
             Room roomUnder = startRoom.y > 0 ? rooms[startRoom.x, startRoom.y - 1] : null;
 
-            PutEntrance(rooms[startRoom.x, startRoom.y], roomUnder);
-            PutExit(rooms[endRoom.x, endRoom.y]);
+            var entrancePos = GetPositionOnGround(rooms[startRoom.x, startRoom.y], roomUnder, roomHeight);
+            var exitPos = GetPositionOnGround(rooms[endRoom.x, endRoom.y], null, roomHeight);
+
+            if (entrancePos == null || exitPos == null) // trying to generate entrance or exit in a room with no spot to put on the ground.
+            {
+                continue;
+            }
+
+            PutEntrance(rooms[startRoom.x, startRoom.y], entrancePos);
+            PutExit(rooms[endRoom.x, endRoom.y], exitPos);
             RemoveRandomDirtTiles();
             GenerateSpikes();
-            PathFindUsingBreadthFirstSearch();
+            bool hasExit = PathFindUsingBreadthFirstSearch();
+
+            if(hasExit is false) // level is not beatable
+            {
+                continue;
+            }
+
             GenerateLadders();
             GenerateDamsel();
             GenerateItems();
@@ -552,7 +614,7 @@ public class LevelGenerator : MonoBehaviour
         rooms[chosenRoom.x, chosenRoom.y].Grid[damselPos.x, damselPos.y].GetComponent<TileScript>().Create(TileType.Damsel);
     }
 
-    public void RegenerateLevel(int width, int height)
+    public void RegenerateLevel()
     {
         if (rooms is not null)
         {
@@ -580,15 +642,13 @@ public class LevelGenerator : MonoBehaviour
         GenerateLevel();
     }
 
-    void PutEntrance(Room room, Room roomUnder)
+    void PutEntrance(Room room, Coordinates pos)
     {
-        var pos = GetPositionOnGround(room, roomUnder, 8);
         room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Entrance);
     }
 
-    void PutExit(Room room)
+    void PutExit(Room room, Coordinates pos)
     {
-        var pos = GetPositionOnGround(room, null, 8);
         room.Grid[pos.x, pos.y].GetComponent<TileScript>().Create(TileType.Exit);
     }
 
@@ -767,7 +827,7 @@ public class LevelGenerator : MonoBehaviour
     {
         //Pick a room from the top row and place the entrance
         int[,] board = new int[levelWidth, levelHeight];
-        int start = Random.Range(0, levelHeight);
+        int start = Random.Range(0, levelWidth);
         int x = start, prevX = start;
         int y = levelHeight - 1, prevY = levelHeight - 1;
         int exit = 0;
@@ -1097,7 +1157,7 @@ public class LevelGenerator : MonoBehaviour
         }
     }
 
-    private void PathFindUsingBreadthFirstSearch()
+    private bool PathFindUsingBreadthFirstSearch()
     {
         GameObject head = null;
         GameObject tail = null;
@@ -1141,10 +1201,16 @@ public class LevelGenerator : MonoBehaviour
         while (current != head) // WAS CAUSING ALL THE FREEZE ISSUES
         {
             TilePath.Add(current);
+            if(!cameFrom.ContainsKey(current))
+            {
+                return false;
+            }
             current = cameFrom[current];
         }
         TilePath.Add(head);
         TilePath.Reverse();
+
+        return true;
         //PathDisplay.GetComponent<TextMeshProUGUI>().text = path.Count.ToString();
     }
 
@@ -1223,9 +1289,9 @@ public class LevelGenerator : MonoBehaviour
 
     void DrawPath()
     {
-        if(Arrows.Count > 0)
+        if (Arrows.Count > 0)
         {
-            foreach(var a in Arrows)
+            foreach (var a in Arrows)
             {
                 Destroy(a);
             }
@@ -1256,7 +1322,7 @@ public class LevelGenerator : MonoBehaviour
                 }
             }
 
-            if(i == RoomPath.Count - 2)
+            if (i == RoomPath.Count - 2)
             {
                 arrow.transform.Rotate(0f, 0f, 180f, Space.World);
             }
@@ -1285,7 +1351,7 @@ public class LevelGenerator : MonoBehaviour
     {
         ShowOverlay = !ShowOverlay;
 
-        foreach(var a in Arrows)
+        foreach (var a in Arrows)
         {
             a.SetActive(ShowOverlay);
         }
