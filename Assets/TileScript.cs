@@ -11,7 +11,7 @@ public class TileScript : MonoBehaviour
     void Start()
     {
         var sprite = gameObject.GetComponent<SpriteRenderer>();
-        switch(Type)
+        switch (Type)
         {
             case TileType.Empty:
                 sprite.color = Color.white;
@@ -32,31 +32,31 @@ public class TileScript : MonoBehaviour
                 sprite.color = new Color(0.588f, 0.294f, 0);
                 break;
             case TileType.Entrance:
-                sprite.color = new Color(0.5f, .75f, 0);
+                sprite.color = Color.blue;
                 break;
             case TileType.Exit:
-                sprite.color = new Color(0.25f, 0, .75f);
+                sprite.color = Color.blue;
                 break;
             case TileType.Spike:
-                sprite.color = new Color(1f, 0.55f, 0);
+                sprite.color = new Color32(228, 108, 10, 255);
                 break;
             case TileType.Ladder:
                 sprite.color = Color.gray;
                 break;
             case TileType.Bomb:
-                sprite.color = new Color(0.1f, 0.1f, 0.1f);
+                sprite.color = Color.black;
                 break;
             case TileType.Coin:
                 sprite.color = Color.yellow;
                 break;
             case TileType.Damsel:
-                sprite.color = Color.red;
+                sprite.color = new Color32(213, 15, 5, 255);
                 break;
             case TileType.Snake:
-                sprite.color = Color.green;
+                sprite.color = new Color32(0, 128, 0, 255);
                 break;
             case TileType.Bat:
-                sprite.color = new Color(0.1f, 0.1f, 0.4f);
+                sprite.color = new Color32(102, 51, 153, 255);
                 break;
             case TileType.Wall:
                 sprite.color = Color.black;
