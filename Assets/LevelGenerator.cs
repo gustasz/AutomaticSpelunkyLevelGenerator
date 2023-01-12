@@ -132,13 +132,11 @@ public class LevelGenerator : MonoBehaviour
             throw new ArgumentException("The input list must not be null or empty.");
         }
 
-        // Normalize the values
         var min = input.Min();
         var max = input.Max();
         var range = max - min;
         var normalizedInput = input.Select(i => (i - min) / (double)range).ToList();
 
-        // Count how many values fall into each percentage range
         var counts = new int[101];
         foreach (var value in normalizedInput)
         {
@@ -240,136 +238,136 @@ public class LevelGenerator : MonoBehaviour
 
     public void GenerateLevel()
     {
-        if (CalibrationMode is false)
-        {
-            switch (sizeDropdown.value)
+            if (CalibrationMode is false)
             {
-                case 0:
-                    return;
-                case 1:
-                    levelWidth = 3;
-                    levelHeight = 3;
-                    break;
-                case 2:
-                    levelWidth = 4;
-                    levelHeight = 4;
-                    break;
-                case 3:
-                    levelWidth = 5;
-                    levelHeight = 5;
-                    break;
-                case 4:
-                    levelWidth = 6;
-                    levelHeight = 6;
-                    break;
-                case 5:
-                    levelWidth = 5;
-                    levelHeight = 4;
-                    break;
-                case 6:
-                    levelWidth = 4;
-                    levelHeight = 5;
-                    break;
+                switch (sizeDropdown.value)
+                {
+                    case 0:
+                        return;
+                    case 1:
+                        levelWidth = 3;
+                        levelHeight = 3;
+                        break;
+                    case 2:
+                        levelWidth = 4;
+                        levelHeight = 4;
+                        break;
+                    case 3:
+                        levelWidth = 5;
+                        levelHeight = 5;
+                        break;
+                    case 4:
+                        levelWidth = 6;
+                        levelHeight = 6;
+                        break;
+                    case 5:
+                        levelWidth = 5;
+                        levelHeight = 4;
+                        break;
+                    case 6:
+                        levelWidth = 4;
+                        levelHeight = 5;
+                        break;
+                }
+
+                switch (difficultyDropdown.value)
+                {
+                    case 0:
+                        return;
+                    case 1:
+                        MinimumDiffPercent = 5;
+                        MaximumDiffPercent = 15;
+                        break;
+                    case 2:
+                        MinimumDiffPercent = 45;
+                        MaximumDiffPercent = 55;
+                        break;
+                    case 3:
+                        MinimumDiffPercent = 85;
+                        MaximumDiffPercent = 95;
+                        break;
+                }
+
+                DiffScoreToGenerateMin = DifficultyRange[sizeDropdown.value - 1, 0];
+                DiffScoreToGenerateMax = DifficultyRange[sizeDropdown.value - 1, 1];
             }
 
-            switch (difficultyDropdown.value)
-            {
-                case 0:
-                    return;
-                case 1:
-                    MinimumDiffPercent = 5;
-                    MaximumDiffPercent = 15;
-                    break;
-                case 2:
-                    MinimumDiffPercent = 45;
-                    MaximumDiffPercent = 55;
-                    break;
-                case 3:
-                    MinimumDiffPercent = 85;
-                    MaximumDiffPercent = 95;
-                    break;
-            }
-
-            DiffScoreToGenerateMin = DifficultyRange[sizeDropdown.value - 1, 0];
-            DiffScoreToGenerateMax = DifficultyRange[sizeDropdown.value - 1, 1];
-        }
-
-        if (DiffScoreToGenerateMin is not 0)
-        {
-            Debug.Log($"Generating a level within {MinimumDiffPercent} - {MaximumDiffPercent} diff score range.");
-        }
-
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-
-        bool GeneratedLevelWithinDifficulty = false;
-        int tries = 0;
-
-        for (int i = 0; i < 100; i++)
-        {
-            ResetLevel();
-
-            var board = GenerateRoomPath();
-
-            BuildAndDigOutRooms(board);
-
-            Coordinates startRoom = RoomPath.First();
-            Coordinates endRoom = RoomPath.Last();
-            Room roomUnder = startRoom.y > 0 ? rooms[startRoom.x, startRoom.y - 1] : null;
-
-            var entrancePos = GetPositionOnGround(rooms[startRoom.x, startRoom.y], roomUnder, roomHeight);
-            var exitPos = GetPositionOnGround(rooms[endRoom.x, endRoom.y], null, roomHeight);
-
-            if (entrancePos == null || exitPos == null) // trying to generate entrance or exit in a room with no spot to put on the ground.
-            {
-                continue;
-            }
-
-            PutEntrance(rooms[startRoom.x, startRoom.y], entrancePos);
-            PutExit(rooms[endRoom.x, endRoom.y], exitPos);
-            RemoveRandomDirtTiles();
-            GenerateSpikes();
-            bool hasExit = PathFindUsingBreadthFirstSearch();
-
-            if(hasExit is false) // level is not beatable
-            {
-                continue;
-            }
-
-            GenerateLadders();
-            GenerateDamsel();
-            GenerateItems();
-            GenerateBats();
-            GenerateSnakes();
-            CalculateDifficultyScore();
-            CalculateFunScore();
-
-            float levelDifficultyPercentage = 0f;
             if (DiffScoreToGenerateMin is not 0)
             {
-                levelDifficultyPercentage = (DifficultyScore - DiffScoreToGenerateMin) / (DiffScoreToGenerateMax - DiffScoreToGenerateMin) * 100;
-                Debug.Log($"generated level diff: {levelDifficultyPercentage}%");
-                DifficultyText.text += $"({Math.Round(levelDifficultyPercentage, 1)}%)";
+                Debug.Log($"Generating a level within {MinimumDiffPercent} - {MaximumDiffPercent} diff score range.");
             }
 
-            if (DiffScoreToGenerateMin == 0 || (levelDifficultyPercentage > MinimumDiffPercent && levelDifficultyPercentage < MaximumDiffPercent))
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+
+            bool GeneratedLevelWithinDifficulty = false;
+            int tries = 0;
+
+            for (int i = 0; i < 100; i++)
             {
-                GeneratedLevelWithinDifficulty = true;
-                tries = i + 1;
-                break;
+                ResetLevel();
+
+                var board = GenerateRoomPath();
+
+                BuildAndDigOutRooms(board);
+
+                Coordinates startRoom = RoomPath.First();
+                Coordinates endRoom = RoomPath.Last();
+                Room roomUnder = startRoom.y > 0 ? rooms[startRoom.x, startRoom.y - 1] : null;
+
+                var entrancePos = GetPositionOnGround(rooms[startRoom.x, startRoom.y], roomUnder, roomHeight);
+                var exitPos = GetPositionOnGround(rooms[endRoom.x, endRoom.y], null, roomHeight);
+
+                if (entrancePos == null || exitPos == null) // trying to generate entrance or exit in a room with no spot to put on the ground.
+                {
+                    continue;
+                }
+
+                PutEntrance(rooms[startRoom.x, startRoom.y], entrancePos);
+                PutExit(rooms[endRoom.x, endRoom.y], exitPos);
+                RemoveRandomDirtTiles();
+                GenerateSpikes();
+                bool hasExit = PathFindUsingBreadthFirstSearch();
+
+                if (hasExit is false) // level is not beatable
+                {
+                    continue;
+                }
+
+                GenerateLadders();
+                GenerateDamsel();
+                GenerateItems();
+                GenerateBats();
+                GenerateSnakes();
+                CalculateDifficultyScore();
+                CalculateFunScore();
+
+                float levelDifficultyPercentage = 0f;
+                if (DiffScoreToGenerateMin is not 0)
+                {
+                    levelDifficultyPercentage = (DifficultyScore - DiffScoreToGenerateMin) / (DiffScoreToGenerateMax - DiffScoreToGenerateMin) * 100;
+                    Debug.Log($"generated level diff: {DifficultyScore} ({levelDifficultyPercentage})%");
+                    DifficultyText.text += $"({Math.Round(levelDifficultyPercentage, 1)}%)";
+                }
+
+                if (DiffScoreToGenerateMin == 0 || (levelDifficultyPercentage > MinimumDiffPercent && levelDifficultyPercentage < MaximumDiffPercent))
+                {
+                    GeneratedLevelWithinDifficulty = true;
+                    tries = i + 1;
+                    break;
+                }
             }
-        }
 
-        watch.Stop();
-        string triesText = tries > 0 ? " tries." : " try.";
-        OutputText.text = $"Generation Time: {watch.ElapsedMilliseconds} ms in {tries} {triesText}";
+            watch.Stop();
+            string triesText = tries > 0 ? " tries." : " try.";
+            OutputText.text = $"Generation Time: {watch.ElapsedMilliseconds} ms in {tries} {triesText}";
 
-        if (GeneratedLevelWithinDifficulty is false)
-        {
-            OutputText.text = $"ERROR: can't generate a level in 100 tries.";
-        }
-    }
+            if (GeneratedLevelWithinDifficulty is false)
+            {
+                OutputText.text = $"ERROR: can't generate a level in 100 tries.";
+            }
+}
 
-    private void RemoveRandomDirtTiles()
+private void RemoveRandomDirtTiles()
     {
         foreach (var tile in allTiles)
         {
@@ -415,7 +413,7 @@ public class LevelGenerator : MonoBehaviour
             }
         }
 
-        DifficultyScore = 25 * RoomPathLength + 5 * TilePathLength + 20 * NumberOfSpikes + 40 * NumberAndTypeOfEnemies + 100 * VerticalCorridors;
+        DifficultyScore = 25 * RoomPathLength + 100 * VerticalCorridors + 20 * NumberOfSpikes + 40 * NumberAndTypeOfEnemies + 100 * VerticalCorridors + 5 * TilePathLength;
 
         DifficultyText.text = $"Difficulty Score: {DifficultyScore}";
     }

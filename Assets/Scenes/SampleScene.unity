@@ -1173,7 +1173,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 156, y: 181.7}
+  m_AnchoredPosition: {x: 156, y: 181.70001}
   m_SizeDelta: {x: 288, y: 91.3338}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1057040262
@@ -1321,10 +1321,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 1280, y: 720}
   m_ScreenMatchMode: 0
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3
@@ -1341,8 +1341,8 @@ Canvas:
   m_GameObject: {fileID: 1059962374}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
-  m_Camera: {fileID: 0}
+  m_RenderMode: 1
+  m_Camera: {fileID: 519420031}
   m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
@@ -3451,8 +3451,10 @@ MonoBehaviour:
   UniqueTiles: 0
   DifficultyScore: 0
   FunScore: 0
-  DiffScoreToGenerate: 0
-  PercentValue: 0
+  DiffScoreToGenerateMin: 0
+  DiffScoreToGenerateMax: 0
+  MinimumDiffPercent: 0
+  MaximumDiffPercent: 0
   sizeDropdown: {fileID: 1583477702}
   difficultyDropdown: {fileID: 1433294507}
   DifficultyText: {fileID: 1515721880}
@@ -3642,7 +3644,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 12.5, y: -0}
+  m_AnchoredPosition: {x: 12.5, y: 0}
   m_SizeDelta: {x: -35, y: -1}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2102259882
@@ -3723,7 +3725,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 113.5, y: 94.2}
+  m_AnchoredPosition: {x: 113.5, y: 94.20001}
   m_SizeDelta: {x: 204.8328, y: 40}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2105630395
